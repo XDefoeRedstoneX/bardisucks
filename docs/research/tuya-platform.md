@@ -70,6 +70,65 @@ From the TinyTuya README (v3.3+ devices):
 
 Some plugs only refresh energy DPs (18–20) after an explicit `UPDATEDPS` request. TinyTuya recommends polling energy no faster than every 5–10 s. **[verified]**
 
+### 2.2b Power strips (4 sockets + USB): Tuya category `pc`
+
+This is the layout used by most 4-socket Tuya strips in the [tuya-local device library](https://github.com/make-all/tuya-local/tree/main/custom_components/tuya_local/devices) (`quad_powerstrip_usb.yaml`, `powerstrip_4outlet_usbs.yaml`, `brilliant_quad_powerstrip_usb.yaml`) **[verified for those models, test for yours]**:
+
+| DP | Meaning | Notes |
+|---:|---|---|
+| 1, 2, 3, 4 | socket 1–4 on/off | bool, each socket switched separately |
+| 5 | USB ports on/off | all USB ports usually switch together. A few models use DP 7 |
+| 9, 10, 11, 12 | countdown socket 1–4 | seconds |
+| 13 | countdown USB | seconds |
+| 17–20 | energy (added kWh, mA, W ×10, V ×10) | only on energy-monitoring strips |
+| 38 | power-on state | `on` / `off` / `memory` (some models use DP 7 with `"0"/"1"/"2"`) |
+| 40 | indicator LED | `relay` (follows state) / `pos` (locator) / `none` |
+| 41 | child lock | bool |
+
+Tuya's cloud codes for these are `switch_1…4`, `switch_usb1`, `countdown_1…`, `relay_status` (`power_on`/`power_off`/`last`) ([Tuya standard instruction set: kg/cz/pc](https://developer.tuya.com/en/docs/iot/s?id=K9gf7o5prgf7s)).
+
+**Buying note:** some cheap strips only switch *all* sockets together. Check that the listing says the sockets are individually controllable before you buy.
+
+### 2.3 Light effects & live-control formats
+
+All of these are hex strings on the wire **[verified]** (Tuya's [generic bulb template](https://developer.tuya.com/en/docs/iot/generic-light-bulb-template?id=Kag3g03a9vy81), checked against the real strings in tuya-local's `rgbcw_lightbulb.yaml`):
+
+**`scene_data` (DP 25): on-bulb animations**
+```
+SS  + unit × 1..8
+      unit = II TT MM HHHH SSSS VVVV BBBB KKKK      (26 hex chars)
+SS   scene number            II   switch interval (0–100, speed)
+TT   change/gradient time    MM   00 static · 01 jump · 02 gradient
+HHHH hue 0–360               SSSS sat 0–1000      VVVV value 0–1000
+BBBB white brightness 0–1000 KKKK white temperature 0–1000
+```
+Real presets seen on Tuya RGBCW bulbs (tuya-local):
+
+| Name | String |
+|---|---|
+| night | `000c0d0000000000000000c80000` (white, brightness 200, warm) |
+| reading | `010e0d0000840000000003e801f4` |
+| working | `020e0d0000e80383000003e803e8` |
+| leisure | `030e0d00001403e8000001f401f4` |
+| soft | `04464602007803e803e800000000464602007803e8000a00000000` (green breathe, 2 units) |
+| colorful / dazzling / gorgeous | `05…` / `06…` / `07…` multi-unit jump/gradient |
+
+So a custom effect is just "pick a scene number, append up to 8 units". **[test]** Find the maximum number of units the Bardi bulb accepts.
+
+**`control_data` (DP 28): live preview while dragging, not saved**
+```
+M HHHH SSSS VVVV BBBB KKKK     (21 hex chars)
+M = 0 direct · 1 gradient
+```
+
+**`music_data` (DP 27):** same shape as `control_data`, streamed by the app in music mode.
+
+**`colour_data` (DP 24):** `HHHHSSSSVVVV` (12 hex chars, H 0–360, S/V 0–1000). The cloud may call this `colour_data` or `colour_data_v2` depending on the product, but the local format is the same.
+
+**Countdown (DP 26):** seconds, 0–86399 on the tuya-local generic bulb. **[test]** Check whether it turns the lamp *off* or *inverts* it when it ends. Most Tuya firmware flips the switch, so "off after 30 min" only makes sense on a lamp that's on.
+
+**Optional on-bulb schedules** (newer firmware only, Base64 raw DPs): `rhythm_mode` (circadian colour schedule), `sleep_mode` (fade out at a time), `wakeup_mode` (sunrise fade at a time). These run **on the bulb**, so no server is needed, but the bulb needs correct time from Tuya's cloud. **[test]** Check whether the Bardi 12 W has them.
+
 **Where to get the exact mapping:** the cloud returns each device's spec (`function` + `status_range`, with codes, types, ranges and **scale**) and a `local_strategy` that maps DP ids to codes. Pull it once during onboarding and generate the device profile from it instead of hand-guessing. **[verified]** ([tuya-device-sharing-sdk `device.py`](https://github.com/tuya/tuya-device-sharing-sdk))
 
 ## 3. The local (LAN) protocol
@@ -147,6 +206,10 @@ For this project, firmware replacement is **optional**. The hub's driver layer s
 3. Which protocol version do the lamps report (`python -m tinytuya scan`)? 3.3, 3.4 and 3.5 all work, but it changes the code path.
 4. The actual DP list and ranges for each lamp/plug (dump them during onboarding).
 5. Do the lamps keep working locally if you block their internet access at the router? (Optional privacy hardening.)
+6. Lamp effects/live control: does DP 28 (`control_data`) work for smooth dragging? What does DP 25 read back after you pick each effect in Smart Life (capture the preset strings)? How many effect units does the bulb accept?
+7. Countdown (DP 26 on lamps, DP 9–13 on the strip): does it turn *off* or *flip* the state?
+8. Does the 12 W bulb report the optional `sleep_mode` / `wakeup_mode` / `rhythm_mode` DPs?
+9. Power strip (once bought): are the sockets individually switchable, and is USB on DP 5 or 7?
 
 ## Sources
 

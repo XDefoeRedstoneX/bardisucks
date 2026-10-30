@@ -1,6 +1,8 @@
 # Design: scenes & automation engine
 
-> Status: proposal v0.1. This part is the whole reason the project exists, so it gets its own spec.
+> Status: **⏸ parked.** This needs an always-on server, so it waits for the mini-PC hub ([architecture §2.3, §11](architecture.md)).
+> Until then, v1 covers the "one tap" side ([groups-and-scenes.md](groups-and-scenes.md)), and **on-device timers** (countdowns, and the bulb's own sleep/wake fades if the firmware has them) give a bit of scheduling without a server.
+> Kept as-is so it's ready to pick up. Engine details assume the hub, which will now reuse the Kotlin `core` module rather than Python.
 > Context: [architecture.md](architecture.md) · [research](../research/tuya-platform.md)
 
 ## 1. What we're fixing

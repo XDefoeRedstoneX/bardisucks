@@ -2,6 +2,8 @@
 
 You can do this today, before any app code exists. At the end you'll have each device's **id, IP, protocol version and `local_key`**, and you'll have toggled a lamp from a Python script with no cloud involved.
 
+Do it for the **two 12 W lamps now**. The power strip gets a short version when you buy it ([Step 8](#step-8-adding-the-power-strip-later)). You need a laptop/PC for steps 4–7. The Android app imports the result later.
+
 > ⚠️ **Never commit `devices.json`, `tinytuya.json`, `tuya-raw.json`, `snapshot.json` or any file containing `local_key`.** The repo's `.gitignore` already blocks these names. Keep it that way.
 >
 > ⚠️ **Once you have the keys, don't remove and re-add devices.** Every re-pair generates a new `local_key`.
@@ -109,7 +111,50 @@ For every device, copy the `status()` output and the spec section from Step 4 in
 - DPs: 20 switch_led bool · 21 work_mode enum[white,colour,scene,music] · 22 bright_value_v2 10–1000 · 23 temp_value_v2 0–1000 · 24 colour_data_v2 · 25 scene_data_v2 · 26 countdown_1 0–86400
 ```
 
-Those files become the device profiles for the hub in phase 1.
+Those files become the device profiles for the app (and later the hub).
+
+## Step 7: Checks the app design depends on (15 min)
+
+Run these with Smart Life **fully closed** (swipe it away), since it can hold the lamp's only LAN connection. Paste the results into `docs/devices/<model>.md`.
+
+```python
+import time, tinytuya
+lamp = tinytuya.BulbDevice(dev_id="bf…", address="192.168.1.50", local_key="…", version=3.3)
+lamp.set_socketPersistent(True)
+
+# A) Full DP list: look for anything beyond 20–28 (e.g. sleep/wake/rhythm modes)
+print(lamp.status())
+
+# B) Live preview (DP 28): should sweep colours smoothly without changing DP 24
+lamp.set_multiple_values({"20": True, "21": "colour"})
+for h in range(0, 360, 10):
+    lamp.set_value(28, f"0{h:04x}03e803e800000000", nowait=True)
+    time.sleep(0.2)
+print("DP 24 after sweep:", lamp.status()["dps"].get("24"))
+
+# C) Countdown (DP 26): lamp is on, so does it turn off after 10 s?
+lamp.set_value(26, 10); time.sleep(13)
+print("after countdown:", lamp.status()["dps"].get("20"))
+```
+
+**D) Built-in effect strings:** in Smart Life pick each built-in scene/effect on a lamp, close Smart Life, then run `print(lamp.status()["dps"].get("25"))` and note the name → string. The app's effect list gets built from these.
+
+**E) Protocol version:** from the `tinytuya scan` output (3.3 / 3.4 / 3.5).
+
+## Step 8: Adding the power strip (later)
+
+1. Buy a Tuya/Smart Life-compatible strip whose sockets are **individually switchable** (check the listing).
+2. Pair it **straight into Smart Life**. No need to go through BARDI.
+3. Re-run Step 4 to fetch its key. Fetching keys again is harmless, only *re-pairing* changes them, so the lamps' keys stay the same.
+4. Test it:
+
+```python
+strip = tinytuya.OutletDevice(dev_id="…", address="192.168.1.60", local_key="…", version=3.3)
+print(strip.status())          # expect DPs 1–4 (sockets), 5 or 7 (USB), 9–13 (countdowns), 38/40/41 (settings)
+strip.turn_on(switch=3); time.sleep(1); strip.turn_off(switch=3)
+```
+
+5. Add `docs/devices/<strip-model>.md` with the DP list (no key!).
 
 ## Troubleshooting
 
