@@ -1,0 +1,34 @@
+# --- Tuya secrets: never commit these ---
+# TinyTuya wizard output (contains local_keys / API secret)
+devices.json
+tinytuya.json
+tuya-raw.json
+snapshot.json
+# Local scratch area for keys, probe scripts, exports
+/secrets/
+# Hub runtime data (SQLite, secrets.json, backups)
+/data/
+*.env
+.env
+.env.*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node / web ---
+node_modules/
+dist/
+.svelte-kit/
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
