@@ -2,7 +2,9 @@
 
 You can do this today, before any app code exists. At the end you'll have each device's **id, IP, protocol version and `local_key`**, and you'll have toggled a lamp from a Python script with no cloud involved.
 
-Do it for the **two 12 W lamps now**. The power strip gets a short version when you buy it ([Step 8](#step-8-adding-the-power-strip-later)). You need a laptop/PC for steps 4–7. The Android app imports the result later.
+Do it for the **two 12 W lamps now**. The power strip gets a short version when you buy it ([Step 8](#step-8-adding-the-power-strip-later)). You need a laptop/PC for steps 4–7. The app (Android or iOS) imports the result later.
+
+**Your sister:** if she shares your lamps, she doesn't need to do any of this, since she'll import your home from your phone. If she has her own lamps at her place, she needs her own Smart Life account and her own run of steps 1–5 (you can run the laptop part for her).
 
 > ⚠️ **Never commit `devices.json`, `tinytuya.json`, `tuya-raw.json`, `snapshot.json` or any file containing `local_key`.** The repo's `.gitignore` already blocks these names. Keep it that way.
 >
@@ -140,6 +142,8 @@ print("after countdown:", lamp.status()["dps"].get("20"))
 **D) Built-in effect strings:** in Smart Life pick each built-in scene/effect on a lamp, close Smart Life, then run `print(lamp.status()["dps"].get("25"))` and note the name → string. The app's effect list gets built from these.
 
 **E) Protocol version:** from the `tinytuya scan` output (3.3 / 3.4 / 3.5).
+
+**F) Second connection** (matters for two phones, you + your sister): run the script above in one terminal, keeping it open with `input()` at the end. In a second terminal, run `print(lamp.status())` with the same settings. Note what happens: the second one fails, **or** it works and the first one gets dropped.
 
 ## Step 8: Adding the power strip (later)
 

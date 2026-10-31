@@ -32,3 +32,23 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# --- Kotlin / Gradle / Android ---
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# --- Xcode / iOS ---
+DerivedData/
+xcuserdata/
+*.xcuserstate
+Pods/
+# Apple signing secrets (App Store Connect API keys, certificates, profiles)
+*.p8
+*.p12
+*.cer
+*.mobileprovision

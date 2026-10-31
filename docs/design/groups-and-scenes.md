@@ -1,7 +1,7 @@
 # Design: groups, one-tap scenes & customization
 
 > Status: proposal v0.2. **This is the v1 focus.** Automations are parked until the mini-PC hub exists ([automations.md](automations.md)).
-> Context: [architecture.md](architecture.md) · [research](../research/tuya-platform.md)
+> Context: [architecture.md](architecture.md) · [iOS & sharing](ios-and-sharing.md) · [research](../research/tuya-platform.md)
 > Devices in scope: **2× BARDI 12 W RGB+WW bulbs** now, plus a **4-socket smart power strip** (extension cord) later.
 
 ## 1. What's wrong with the BARDI app (and what we do instead)
@@ -12,7 +12,7 @@
 | A power strip is one device with 4 switches buried inside it | Every socket (and the USB port) is its own **channel**, with its own name, icon, room and groups |
 | Tap-to-Run gives barely any options | Scenes set **any field on any channel or group**, can leave fields unchanged, can toggle/cycle/restore, and can schedule an on-device "turn off after" timer |
 | Fixed layout and icons | Custom names, icons, colours, room order, dashboard tiles, saved colour palettes |
-| Must open the app | **Quick Settings tiles, home-screen widgets, launcher shortcuts** on Android |
+| Must open the app | **Android:** Quick Settings tiles, widgets, launcher shortcuts · **iOS:** Control Center, widgets, Siri/Shortcuts, Action button |
 
 ## 2. Model
 
@@ -108,7 +108,7 @@ steps:
 - **Capture current:** pick channels and save how they look right now as a scene.
 - **Preview** (long-press): shows a strip of the colours/states it'll apply.
 - **Auto cover:** the scene card is tinted with the colours the scene sets.
-- **Run from anywhere:** in-app, Quick Settings tile, widget, launcher shortcut, or a deep link (`bardisucks://scene/movie`) for NFC tags / other apps.
+- **Run from anywhere:** in-app, Quick Settings tile / Control Center, widget, launcher shortcut / quick action, Siri ("movie mode"), or a deep link (`bardisucks://scene/movie`) for NFC tags / Shortcuts / Tasker.
 
 ## 5. Effects (bulb-side animations)
 
@@ -126,20 +126,20 @@ Tuya bulbs can run an animation **on the bulb itself** from one DP (`scene_data`
 | **Rooms & groups** | name, icon, accent colour, order, collapse. Group brightness mode (absolute/relative), colour mode (same/palette) |
 | **Home dashboard** | sections you choose and order: Favourites · Scenes · Rooms · Groups. Tile size small/large. Lamp tiles are **tinted with the lamp's real current colour** |
 | **Colours** | saved swatches per lamp + shared palettes. "Palette from photo" (pick colours from an image) |
-| **Theme** | Material You (wallpaper colours), dark / light / pure-black |
+| **Theme** | Android: Material You (wallpaper colours). iOS: your accent colour. Both: dark / light / pure-black |
 | **Language** | Indonesian + English strings |
-| **Backup** | export/import everything as one file (keys encrypted with a passphrase). Same file later imports into the hub |
+| **Backup & sharing** | export/import as one file (keys encrypted with a passphrase). **Home config** (devices, groups, scenes, effects, palettes) is shareable with your sister. **Personal** stuff (dashboard, favourites, tiles/widgets, theme) stays per phone. The same file later imports into the hub |
 
-## 7. Android one-tap surfaces
+## 7. One-tap surfaces (Android & iOS)
 
-| Surface | What it does | Notes |
+| Android | iOS | What it does |
 |---|---|---|
-| **Quick Settings tiles** | 6 tile slots you bind to a channel, group, scene or cycle scene. Tile shows on/off state and the scene name | Android needs every tile declared in advance, so we ship 6 slots: "Bardi 1–6" |
-| **Home-screen widgets** | (a) scene grid 2×2 … 4×2. (b) single channel/group with on/off + brightness −/+. (c) whole room | Jetpack Glance. State refreshes when the app is open or a widget button is used |
-| **Launcher shortcuts** | long-press the app icon for your top 4 scenes | dynamic shortcuts |
-| **Deep links** | `bardisucks://scene/<id>`, `…/toggle/<channel>` | for NFC tags, Tasker, Routines |
+| **Quick Settings tiles** (6 slots, "Bardi 1–6") | **Control Center controls** (+ Lock Screen, Action button), iOS 18+ | bind each to a channel, group, scene or cycle scene. Shows on/off state |
+| **Glance widgets** | **Interactive WidgetKit widgets** (Home + Lock Screen), iOS 17+ | (a) scene grid. (b) one channel/group with on/off + brightness −/+. (c) whole room |
+| **Launcher shortcuts** | **Quick actions** (long-press icon) | top 4 scenes |
+| **Deep links** for Tasker / Routines / NFC | **App Intents** for Siri, Shortcuts, Spotlight, NFC & time-of-day automations | "Hey Siri, movie mode". Phone-based mini-automations until the hub exists |
 
-All of these talk **directly to the devices over Wi-Fi**: connect, send, close (~0.2–0.8 s). Away from home they show "Not on home Wi-Fi". Remote control comes with the hub + Tailscale later. Until then the Smart Life app still works remotely through Tuya's cloud.
+All of these talk **directly to the devices over Wi-Fi**: connect, send, close (~0.2–0.8 s). Away from home they show "Not on home Wi-Fi". Remote control comes with the hub + Tailscale later. Until then the Smart Life app still works remotely through Tuya's cloud. Platform details: [ios-and-sharing.md §3](ios-and-sharing.md#3-one-tap-surfaces-android--ios).
 
 ## 8. Screens (wireframes)
 
@@ -176,6 +176,6 @@ All of these talk **directly to the devices over Wi-Fi**: connect, send, close (
 2. **Rooms + groups:** union capabilities, relative brightness, palette colour, parallel fan-out
 3. **Power strip:** per-socket channels, all-on/off, countdowns, power-on behaviour, child lock, LED mode
 4. **Scenes:** normal/toggle/cycle, partial states, capture, on-device off-timers
-5. **Android surfaces:** QS tiles, widgets, launcher shortcuts, deep links
+5. **One-tap surfaces:** Android QS tiles, widgets, shortcuts, deep links → then the iOS equivalents (widgets, Siri/Shortcuts, Control Center)
 6. **Effects:** built-in list, custom effect editor
-7. **Polish:** themes, palette-from-photo, backup/export, Indonesian strings
+7. **Polish & sharing:** themes, palette-from-photo, backup/export, Share home (you → sister), Indonesian strings
