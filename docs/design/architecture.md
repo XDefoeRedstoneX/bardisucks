@@ -1,33 +1,34 @@
 # Design: architecture
 
-> Status: proposal **v0.3**. **Android + iOS from one Kotlin Multiplatform codebase, no server yet.** Focus is customization, groups and one-tap scenes ([groups-and-scenes.md](groups-and-scenes.md)). iOS and two-person sharing: [ios-and-sharing.md](ios-and-sharing.md).
+> Status: proposal **v0.4**. **Android only (phones + tablets), no server yet.** Focus is customization, groups and one-tap scenes ([groups-and-scenes.md](groups-and-scenes.md)). Your sister's tablet, Huawei notes and why iOS is parked: [household-and-platforms.md](household-and-platforms.md).
 > Automations are parked until the mini-PC hub exists ([automations.md](automations.md)).
 > Background: [research/tuya-platform.md](../research/tuya-platform.md).
 
 ## 1. Goals
 
-1. **Replace the BARDI app** for 2× BARDI 12 W RGB+WW bulbs now, plus a 4-socket smart power strip later, on **Android (you) and iOS (your sister)**.
+1. **Replace the BARDI app** for 2× BARDI 12 W RGB+WW bulbs now, plus a 4-socket smart power strip later, on **your Android phone**. Your sister runs the same app on her **Huawei tablet** for her own lamps.
 2. **Groups that actually work:** colour, brightness, white temperature and effects on a whole group, not just power and mode.
 3. **One-tap scenes with real options:** any field on any lamp/socket/group, partial changes, toggle/restore, cycle, on-device off-timers.
-4. **Customization:** names, icons, rooms, layout, palettes, themes, plus native one-tap surfaces (Android Quick Settings tiles/widgets/shortcuts, iOS Control Center/widgets/Siri).
+4. **Customization:** names, icons, rooms, layout, palettes, themes, plus Quick Settings tiles, home-screen widgets and launcher shortcuts. Tablet layout too.
 5. **Local:** talks to devices over home Wi-Fi, works when the internet is down, responds well under a second.
 6. **Ready for the hub later:** the device and scene logic is written once and reused by the future mini-PC server.
+7. **No Google Play services dependency**, so it runs on Huawei devices (and any Android) as a plain APK.
 
-Non-goals for v1: automations/schedules (→ hub), remote control away from home (→ hub + Tailscale), real-time config sync between phones (→ hub), cameras, Zigbee/BLE.
+Non-goals for v1: automations/schedules (→ hub), remote control away from home (→ hub + Tailscale), iOS ([parked](household-and-platforms.md#4-ios-parked)), cameras, Zigbee/BLE.
 
 ## 2. Key decisions
 
 ### 2.1 v1 = the phone talks directly to the devices
 
-Without automations, nothing has to run 24/7, so we don't need a server yet. Each phone's app opens the encrypted LAN connection to each lamp/strip itself.
+Without automations, nothing has to run 24/7, so we don't need a server yet. The app on each phone/tablet opens the encrypted LAN connection to each of *its* lamps/strip itself.
 
 The one Tuya constraint to respect is **one LAN connection per device**. The app holds connections only while it's on screen and releases them shortly after you leave. Widgets and tiles connect, send and disconnect (§6).
 
-### 2.2 Native apps from one Kotlin Multiplatform codebase, not a web app
+### 2.2 Native Android (Kotlin), not a web app
 
 - **Browsers can't open raw TCP/UDP sockets**, so a web app/PWA can't talk to Tuya devices without a server in the middle. With no server in v1, it has to be native.
-- **Tiles/controls, widgets and shortcuts** are a big part of "one tap", and they're native features on both platforms.
-- **Kotlin Multiplatform (KMP)** compiles the same protocol + domain code for Android, iOS **and the JVM** (the future hub). **Compose Multiplatform** shares the screens too (stable on iOS since May 2025). So the protocol, groups, scenes and UI are written once, and only the tiles/widgets/controls are per-platform.
+- **Quick Settings tiles, home-screen widgets and launcher shortcuts** are a big part of "one tap", and they're native Android features.
+- The protocol (`tuya-lan`) and domain logic (`core`) are **plain Kotlin with no Android APIs**. The future hub on the mini PC reuses them as-is. They also keep iOS possible later (they'd move to Kotlin Multiplatform), but nothing is built for iOS now.
 
 ### 2.3 v2 (later) = mini-PC hub
 
@@ -37,7 +38,7 @@ When the mini PC exists, it takes over device connections and runs automations. 
 flowchart LR
   subgraph V2["v2: later, with the mini PC"]
     direction LR
-    A2["📱 Android / iOS app<br/>(hub mode)"]
+    A2["📱 Android app<br/>(hub mode)"]
     H["🖥️ Hub on mini PC<br/>same core + tuya-lan<br/>+ automations"]
     D2["💡💡🔌"]
     TS(("Tailscale"))
@@ -49,7 +50,7 @@ flowchart LR
 
   subgraph V1["v1: now"]
     direction LR
-    A1["📱 Android / iOS app<br/>(UI, tiles, widgets)"]
+    A1["📱 Android app<br/>(phone or tablet)"]
     L1a["💡 Lamp 1"]
     L1b["💡 Lamp 2"]
     S1["🔌 Power strip<br/>(4 sockets + USB)"]
@@ -63,32 +64,29 @@ flowchart LR
 
 | Layer | Choice | Why |
 |---|---|---|
-| Language | **Kotlin Multiplatform** | one codebase → Android, iOS, JVM (hub later) |
-| UI | **Compose Multiplatform + Material 3** | shared screens on both phones, easy custom colour wheel/sliders. Material You colours on Android |
-| Android one-tap | `TileService` (6 slots), **Jetpack Glance** widgets, launcher shortcuts | native Android |
-| iOS one-tap | **WidgetKit** interactive widgets, **Control Center controls**, **App Intents** (Siri/Shortcuts), quick actions | native Swift, small. See [ios-and-sharing.md §3](ios-and-sharing.md#3-one-tap-surfaces-android--ios) |
+| Language | **Kotlin** | Android standard. `core` + `tuya-lan` are plain Kotlin/JVM, reused by the hub later |
+| UI | **Jetpack Compose + Material 3** | modern, easy custom colour wheel/sliders, adaptive layouts for phone **and tablet** |
+| One-tap | `TileService` (6 slots), **Jetpack Glance** widgets, launcher shortcuts, deep links | native Android |
 | Async | kotlinx.coroutines | parallel group fan-out, per-device actors |
-| Storage | **Room (KMP)** + DataStore (KMP) | channels, groups, scenes, palettes, settings. Same schema on both |
-| Secrets | `local_key`s in **Android Keystore** / **iOS Keychain** (`expect/actual`) | keys never leave the phone in plaintext |
-| Serialization | kotlinx.serialization | profiles, import/export, sharing, backup |
-| Sockets | `ktor-network` (JVM + iOS), with Apple's Network framework as the iOS fallback | raw TCP for the Tuya protocol |
-| Crypto | `expect/actual`: `javax.crypto` on Android/JVM. On iOS `cryptography-kotlin` or CommonCrypto (AES-ECB) + CryptoKit (AES-GCM) | AES-ECB, AES-GCM, HMAC-SHA256, CRC32 |
+| Storage | **Room** (SQLite) + DataStore | channels, groups, scenes, palettes, settings |
+| Secrets | `local_key`s AES-GCM-encrypted with an **Android Keystore** key | keys never leave the device in plaintext |
+| Serialization | kotlinx.serialization | profiles, import/export, backup |
+| Crypto | `javax.crypto` (AES-ECB, AES-GCM, HMAC-SHA256) + `java.util.zip.CRC32` | everything the Tuya protocol needs, no native libs |
+| Build & release | Gradle, GitHub Actions on **free Linux runners** → signed APK | no Mac, no store, no fees |
 | Reference / test oracle | **TinyTuya** (Python, on a laptop) | used to verify our Kotlin protocol port against real devices |
 
-**Android:** min SDK 26 (Android 8), target latest. Permissions: `INTERNET`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE` (to hear discovery broadcasts), plus the local-network permission on Android versions that require it.
-**iOS:** min iOS 17 (Control Center controls need 18). Local Network permission (`NSLocalNetworkUsageDescription`). No broadcast discovery (see [ios-and-sharing.md §4](ios-and-sharing.md#4-ios-specific-constraints)).
+Min SDK 26 (Android 8), target latest. Permissions: `INTERNET`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE` (to hear discovery broadcasts), plus the local-network permission on Android versions that require it.
+
+**No Google Play services anywhere** (no Firebase, FCM, Play Integrity, Maps or ML Kit). Huawei devices don't have them, and we don't need them: everything is local. Material You wallpaper colours are used where the OS supports them, with a chosen accent colour otherwise (e.g. on HarmonyOS).
 
 ### Repo layout (once code starts)
 
 ```
-shared/
-  tuya-lan/      KMP: Tuya LAN protocol 3.1–3.5, discovery, DeviceConnection (commonMain + jvm/ios bits)
-  core/          KMP: channels, profiles, groups, scenes, effects codec, colour math, import/export
-  ui/            Compose Multiplatform: all app screens
-androidApp/      Android entry point + Quick Settings tiles + Glance widgets + shortcuts
-iosApp/          Xcode project: app entry hosting the shared UI + WidgetKit + Control Center + App Intents (Swift)
+tuya-lan/        plain Kotlin/JVM: Tuya LAN protocol 3.1–3.5, discovery, DeviceConnection
+core/            plain Kotlin: channels, profiles, groups, scenes, effects codec, colour math, import/export
+app/             Android app: Compose UI (phone + tablet layouts), Room, tiles, widgets, shortcuts
 cli/             JVM command-line tool: test tuya-lan against real devices from a laptop
-hub/  (later)    Ktor server on the mini PC, reusing shared/core + shared/tuya-lan; automations live here
+hub/  (later)    Ktor server on the mini PC, reusing core + tuya-lan; automations live here
 docs/
 ```
 
@@ -148,30 +146,30 @@ A Kotlin port of what TinyTuya does, built in this order:
 1. **Frame codec:** `0x55AA` frames (3.1–3.4) and `0x6699` frames (3.5). Sequence numbers, CRC32 / HMAC-SHA256 / GCM tags.
 2. **Crypto + session:** AES-128-ECB payloads, and for 3.4/3.5 the 3-message session-key negotiation (cmd `0x03`/`0x04`/`0x05`).
 3. **Commands:** `CONTROL` (`0x07`) / `CONTROL_NEW` (`0x0d`), `DP_QUERY` (`0x0a`) / `DP_QUERY_NEW` (`0x10`), `STATUS` push (`0x08`), `HEART_BEAT` (`0x09`), `UPDATEDPS` (`0x12`).
-4. **Discovery:** listen on UDP 6666/6667 and probe UDP 7000 (3.5) to learn IP and version (Android/JVM). On iOS, use known IPs plus a TCP 6668 subnet sweep instead (no broadcast entitlement needed).
+4. **Discovery:** listen on UDP 6666/6667 and probe UDP 7000 (3.5) to learn IP and version. On a shared Wi-Fi this also hears *other people's* Tuya devices, so the app only lists devices it has a key for. The rest show up under "Other devices on this network", hidden by default.
 
 We only build the protocol versions the Bardi devices actually report (phase 0 scan) first. The rest come later.
 
 **Testing:**
 - **Golden tests:** TinyTuya on a laptop produces frames for a known key/payload/nonce. Our encoder has to produce identical bytes, and our decoder has to parse TinyTuya's.
-- **Live tests:** the `cli` tool toggles and reads the real lamps from a laptop before any phone UI exists. The same tests later run on an iPhone (iOS spike).
+- **Live tests:** the `cli` tool toggles and reads the real lamps from a laptop before any Android UI exists.
 
 ## 6. Connections on the phone
 
 ```
-ConnectionManager (singleton, shared code, one per app/extension process)
+ConnectionManager (singleton, app process)
  ├─ DeviceActor per device (coroutine + command channel)
  │    connect → handshake → persistent socket
  │    receive loop: status pushes → normalize via profile → StateStore → UI/widgets
  │    heartbeat every ~12 s
  │    commands: coalesce (last value per DP wins), merge into one multi-DP frame,
  │              ≥150 ms between frames, live-preview (DP 28) throttled to ~5/s
- ├─ Discovery while app is in foreground (Android: UDP + MulticastLock · iOS: TCP sweep when a device goes missing)
+ ├─ Discovery (UDP + MulticastLock) while app is in foreground
  └─ Lifecycle:
       app visible           → connect all devices (warm, so groups fire in sync)
-      polite mode (2 people)→ also release a device ~20 s after the last touch
-      app hidden            → close all (Android after ~30 s; iOS suspends the app right away)
-      tile/widget/control   → connect only the needed devices, send, read back, close
+      app hidden > 30 s     → close all (frees the device's single LAN slot, saves battery)
+      tile/widget/shortcut  → connect only the needed devices, send, read back, close
+      shared device (opt.)  → "polite mode": also release it ~20 s after the last touch
 ```
 
 - **Group fan-out:** one coroutine per member device, all sent at once (`awaitAll`). With warm connections, members change within ~100 ms of each other.
@@ -181,14 +179,15 @@ ConnectionManager (singleton, shared code, one per app/extension process)
 ## 7. Getting keys onto the phone
 
 The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-onboarding.md)). Then:
-- **Import file:** the app accepts `tuya-local-key` output or TinyTuya's `devices.json` (+ `tuya-raw.json` for DP specs). Send it to the phone (Android: Quick Share / USB / Drive · iOS: AirDrop / Files), then go to **Settings → Import devices**. The app encrypts the keys and you delete the file.
-- **Share home:** one phone exports its home config (keys encrypted with a passphrase) and the other imports it. See [ios-and-sharing.md §2](ios-and-sharing.md#2-is-she-in-your-house-or-her-own).
+- **Import file:** the app accepts `tuya-local-key` output or TinyTuya's `devices.json` (+ `tuya-raw.json` for DP specs). Send it to the phone/tablet (Quick Share / USB / Drive / WhatsApp to yourself), then go to **Settings → Import devices**. Pick which devices to import, so your sister's tablet only takes her lamps. The app encrypts the keys and you delete the file.
+- **Share devices (optional, later):** export selected devices from one app to another if you ever want to control each other's lamps. See [household-and-platforms.md §1](household-and-platforms.md#1-your-sisters-setup).
 - **Manual add:** id + key + IP + version form (IP/version can be auto-filled from discovery).
 - **Later:** an in-app QR login (same flow as `tuya-local-key`), needing a second screen to show the QR. Not needed for v1.
 
 ## 8. Security
 
-- `local_key`s are encrypted with a non-exportable Android Keystore key (Android) or stored in the Keychain, device-only, shared with the app's own extensions (iOS). They're excluded from cloud backups, never logged, and shown only after a fingerprint/Face ID/PIN check.
+- `local_key`s are encrypted with a non-exportable Android Keystore key, excluded from Android auto-backup, never logged, and shown only after a fingerprint/PIN check.
+- The release APK is signed with **your own signing key**. Keep it backed up outside the repo (`*.jks`/`*.keystore` are git-ignored). Losing it means updates can't install over the old app.
 - **Backup/export** is one file. Keys are included only if you set a passphrase. The same file imports into the hub later.
 - The repo `.gitignore` blocks key files (`devices.json`, `tinytuya.json`, `tuya-raw.json`, `snapshot.json`, `/secrets/`).
 - **Optional later:** put the IoT devices on their own Wi-Fi/VLAN and block their internet access once local control is proven.
@@ -200,7 +199,8 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 | Internet down | everything works (LAN only) |
 | Phone off / away | lamps and strip still work by hand and via Smart Life (cloud). On-device countdowns still fire |
 | Smart Life open on another phone at the same time | that phone uses cloud control, which works fine. If it grabbed the LAN slot, our app retries |
-| Two phones running this app (you + sister) | works: each releases connections when backgrounded or idle (polite mode). Tapping the same lamp at the same instant means one retries. Truly simultaneous use + synced scenes is what the hub solves |
+| You + sister on the same Wi-Fi, different lamps | no conflict: each app only connects to its own lamps |
+| Two apps controlling the *same* lamp (only if you share devices later) | polite mode releases idle connections. Tapping at the same instant means one retries. The hub removes this entirely |
 | Device IP changes | discovery finds it again. Still set DHCP reservations |
 | Device re-paired in Smart Life | key changed, so the app shows **Re-import key** |
 | Power cut | the strip follows its power-on setting (DP 38: on/off/memory), and bulbs follow their own power-on behaviour |
@@ -217,9 +217,8 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 | **5. One-tap scenes** | normal/toggle/cycle, partial states, capture current, on-device off-timers | your 3–5 favourite looks are one tap |
 | **6. Android surfaces** | 6 QS tile slots, Glance widgets, launcher shortcuts, deep links | lamps controllable without opening the app |
 | **7. Effects & polish** | built-in effects, custom effect editor, palette-from-photo, themes, backup, Indonesian strings | |
-| **iOS track** (can start after phase 1) | iOS spike → app shell with shared screens → widgets, Siri/Shortcuts, Control Center → TestFlight ([details](ios-and-sharing.md#6-order-of-work-fits-into-the-roadmap)) | your sister installs it from TestFlight |
-| **Sharing** (with phase 5) | split home vs. personal config, Share home export/import, polite mode | both phones run the same scenes |
-| **Later: hub** | mini PC + `hub/` (Ktor) + hub mode in app, automations ([parked spec](automations.md)), Tailscale remote, live config sync between phones | |
+| **Tablet & sister** (with phase 2–3) | adaptive two-pane layout, dashboard mode, selective import, test on her Huawei tablet ([checklist](household-and-platforms.md#2-huawei-tablet-checklist)) | your sister controls her lamps from her tablet |
+| **Later: hub** | mini PC + `hub/` (Ktor) + hub mode in app, automations ([parked spec](automations.md)), Tailscale remote. One hub can serve both your lamps and your sister's (separate "homes") | |
 
 ## 11. Planning the mini PC (later, short version)
 
@@ -234,16 +233,15 @@ The hub is tiny: a few hundred MB RAM, almost no CPU.
 | Option | Verdict |
 |---|---|
 | PWA / web app | can't open raw sockets, so it needs a server. Fits v2 as an extra client, not v1 |
-| Flutter + Dart `tinytuya` port | also covers Android + iOS, and there's a young Dart port that claims 3.1–3.5 support. But tiles/widgets/controls still need native code on both platforms, and the hub couldn't share the code as easily. KMP + Compose Multiplatform gets the same reach and keeps the hub reuse |
-| Separate native apps (Kotlin + Swift) | best "native feel", but double the UI work. Not worth it for a personal app |
+| Flutter + Dart `tinytuya` port | there's a young Dart port that claims 3.1–3.5 support. Viable, but QS tiles/widgets still need native code, and the hub couldn't share the code as easily. Kotlin wins on both |
+| Kotlin Multiplatform for iOS too | possible (Compose Multiplatform is stable on iOS), but iOS needs a Mac and $99/yr to install without 7-day expiry. Parked. `core`/`tuya-lan` stay platform-neutral so it's not ruled out |
 | Embed Python TinyTuya in Android (Chaquopy) | works, but adds ~20 MB+ and a second runtime. A Kotlin port is cleaner and reusable on the hub |
 | Tuya Smart Life App SDK | commercial licence, cloud-based |
 | Home Assistant + Tuya Local | great for automations, but you said customization/UI is the main pain, and HA's UI isn't tailored for this. Still a fine choice for the mini PC era if you'd rather not build the hub |
 
 ## 13. Still open
 
-- **Your sister: same house or her own?** Decides sharing vs. a separate setup ([ios-and-sharing.md §2](ios-and-sharing.md#2-is-she-in-your-house-or-her-own)).
-- **iOS distribution:** Apple Developer Program ($99/yr, recommended) vs. free 7-day sideloading. And is there a Mac (own/borrowed) or do we build in the cloud?
+- **Your sister's tablet OS:** HarmonyOS 2–4 / EMUI runs our APK. HarmonyOS 5/6 ("NEXT") does not ([checklist](household-and-platforms.md#2-huawei-tablet-checklist)).
 
 - **Power strip model:** pick one that's Tuya/Smart Life-compatible with **individually switchable** sockets (+ switchable USB). Energy monitoring is a bonus. Pair it straight into Smart Life, not BARDI.
 - **Protocol version** of the 12 W bulbs (phase 0 scan) decides which part of `tuya-lan` gets built first.
