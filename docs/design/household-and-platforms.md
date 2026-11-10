@@ -23,7 +23,8 @@ Wi-Fi ─┬─ 💡💡 your lamps (+ strip)  ◄── your phone (only has yo
 
 ## 2. Huawei tablet checklist
 
-**First, check the OS:** *Settings → About tablet*.
+**First, check the OS:** *Settings → About tablet → **HarmonyOS version*** (the number, e.g. `4.2.0`). If only "HarmonyOS" shows without a number, tap that row.
+**Definitive 1-minute test:** in the tablet's browser, download any app's APK (e.g. F-Droid from f-droid.org) and open it. If it offers to install, our app will run.
 
 | Shows | Runs our app? |
 |---|---|

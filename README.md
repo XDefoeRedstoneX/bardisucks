@@ -22,14 +22,14 @@ v2 (later)  📱 Android app ──► 🖥️ mini-PC hub (+ automations, remot
 
 ## Status
 
-📐 **Research & design.** No app code yet. Next steps: [Phase 0](docs/guides/phase-0-onboarding.md) (you, with the lamps), then the Kotlin protocol library.
+📐 **Research & design.** No app code yet, only the Phase 0 helper scripts in `tools/phase0/`. Next steps: [Phase 0](docs/guides/phase-0-onboarding.md) (you, on Windows, with the lamps), then the Kotlin protocol library.
 
 ## Docs
 
 | Doc | What's in it |
 |---|---|
 | [Research: how Bardi/Tuya devices work](docs/research/tuya-platform.md) | Tuya vs. OEM apps, data points for bulbs and power strips, effect formats, LAN protocol 3.1–3.5, getting local keys |
-| [Phase 0 guide](docs/guides/phase-0-onboarding.md) | move lamps to Smart Life, pull keys, toggle a lamp from Python, run the checks the design depends on |
+| [Phase 0 guide](docs/guides/phase-0-onboarding.md) | Windows walkthrough: move lamps to Smart Life, `get_keys.py` (QR login → keys), `probe.py` (local control test + checks → key-free report) |
 | [Design: architecture](docs/design/architecture.md) | Android app (Kotlin) talking directly to devices, module layout, profiles, connection handling, roadmap, mini-PC plan |
 | [Design: groups, scenes & customization](docs/design/groups-and-scenes.md) | **the v1 focus:** channel/group model, group control rules, scene options, effects, customization, tiles/widgets, wireframes |
 | [Design: sister's setup & platforms](docs/design/household-and-platforms.md) | her own lamps on the same Wi-Fi, Huawei tablet checklist, tablet layout/dashboard mode, why iOS is parked |

@@ -1,171 +1,129 @@
-# Phase 0: get your Bardi devices onto local control
+# Phase 0: get your Bardi devices onto local control (Windows)
 
-You can do this today, before any app code exists. At the end you'll have each device's **id, IP, protocol version and `local_key`**, and you'll have toggled a lamp from a Python script with no cloud involved.
+At the end you'll have each lamp's **id, IP, protocol version and `local_key`**, you'll have controlled the lamps from your PC with no cloud involved, and you'll have a **report (with no keys in it)** to send back so the app can be built against your real lamps.
 
-Do it for the **two 12 W lamps now**. The power strip gets a short version when you buy it ([Step 8](#step-8-adding-the-power-strip-later)). You need a laptop/PC for steps 4–7 (Windows or Linux is fine, no Mac needed). The Android app imports the result later.
+Time: about 45 minutes for the two 12 W lamps. The power strip gets a short version when you buy it ([Step 7](#step-7-adding-the-power-strip-later)). Your sister's lamps: [Step 8](#step-8-your-sisters-lamps).
 
-**Your sister's lamps:** same steps, ideally into *her own* Smart Life account. She can use her iPhone or her tablet for the Smart Life parts, and you run the laptop parts. Or, as a shortcut, pair her lamps into a separate "home" in your Smart Life account so one key fetch covers both of you. See [household-and-platforms.md §1](../design/household-and-platforms.md#1-your-sisters-setup). Before anything else, check that her tablet can run Android apps ([§2](../design/household-and-platforms.md#2-huawei-tablet-checklist)).
-
-> ⚠️ **Never commit `devices.json`, `tinytuya.json`, `tuya-raw.json`, `snapshot.json` or any file containing `local_key`.** The repo's `.gitignore` already blocks these names. Keep it that way.
+> ⚠️ **`secrets\devices.json` contains your lamps' keys.** It's git-ignored. Never commit it or send it to anyone. The report from Step 5 has no keys and is safe to share.
 >
-> ⚠️ **Once you have the keys, don't remove and re-add devices.** Every re-pair generates a new `local_key`.
+> ⚠️ **Once you have the keys, don't remove and re-add the lamps.** Every re-pair generates a new `local_key`.
 
 Background on *why* each step exists: [research/tuya-platform.md](../research/tuya-platform.md).
 
 ---
 
+## Step 0: Set up the Windows PC (10 min)
+
+1. **Install Python.** In PowerShell:
+   ```powershell
+   winget install -e --id Python.Python.3.12
+   ```
+   (Or use the installer from python.org and tick **"Add python.exe to PATH"**.) Close and reopen PowerShell, then check that `py --version` prints 3.12.
+2. **Get this repo:** on GitHub, **Code → Download ZIP**, then extract it (e.g. to `C:\bardisucks`). Or `git clone` it if you have Git.
+3. **Open PowerShell in that folder:** in Explorer, right-click the folder → **Open in Terminal**.
+4. **Install the script dependencies:**
+   ```powershell
+   py -m pip install -r tools\phase0\requirements.txt
+   ```
+5. **Set your Wi-Fi to "Private"** (otherwise Windows blocks the lamps' discovery broadcasts): *Settings → Network & internet → Wi-Fi → your network → Network profile type → **Private***.
+   Later, when Windows asks whether Python may use the network, tick **Private networks** and click **Allow**.
+
 ## Step 1: Inventory (5 min)
 
-For each device, in the BARDI app open the device → ✏️/⋯ → **Device Information** and write down:
-- name / room
-- **Virtual ID** (= Tuya device id)
-- **IP address** and **MAC**
-- model (from the box or the app's product page)
+For each lamp, in the BARDI app open the lamp → ✏️/⋯ → **Device Information** and write down the name, **IP address** and **MAC**.
 
-In your router's admin page, **reserve a fixed IP (DHCP reservation)** for each MAC. Not strictly required, but it saves a lot of hassle later.
+In your router's admin page, **reserve a fixed IP (DHCP reservation)** for each MAC. Not strictly required, but it saves hassle later.
 
-## Step 2: Quick check: can we skip re-pairing? (5 min, optional)
+## Step 2: Quick check: can we skip re-pairing? (2 min, optional)
 
-Try **Step 4, Option A** with the BARDI app. If the BARDI app has *Me → Settings → Account and Security → User Code* **and** its scanner accepts the QR login, you're done and can skip Step 3.
-(It probably won't work, since OEM apps are separate account systems, but it only costs a minute to check.)
+If the BARDI app has *Me → Settings → Account and Security → **User Code***, try Step 4 with that code and scan the QR with the **BARDI** app. If it works, skip Step 3. (It probably won't, since BARDI is a separate account system, but it's a quick check.)
 
-## Step 3: Move devices from BARDI to Smart Life (10 min per device)
+## Step 3: Move the lamps from BARDI to Smart Life (10 min per lamp)
 
-1. Install **Smart Life** (Android/iOS). Create an account with region **Indonesia**. Don't use a "guest" account.
-2. In the BARDI app: device → ✏️/⋯ → **Remove device**. If offered, pick **"Disconnect and wipe data"**.
-3. Put the device into pairing mode:
-   - **Bulb:** switch it off/on 3 times (on–off–on–off–on) until it blinks fast.
-   - **Plug:** hold the button ~5 s until the LED blinks fast.
-4. In Smart Life: **+ → Add Device**. Make sure your phone is on **2.4 GHz** Wi-Fi and Smart Life has Location + Local Network permissions.
-5. Rename it in Smart Life to match your inventory, and check the new IP in Device Information. The **device id usually stays the same, but the key is new**.
+1. Install **Smart Life** on your phone. Create an account with region **Indonesia**. Don't use a "guest" account.
+2. In the BARDI app: lamp → ✏️/⋯ → **Remove device**. If offered, pick **"Disconnect and wipe data"**.
+3. Put the lamp in pairing mode: switch it off/on 3 times (on–off–on–off–on) until it **blinks fast**.
+4. In Smart Life: **+ → Add Device**. Your phone must be on **2.4 GHz** Wi-Fi, and Smart Life needs Location + Nearby devices permissions.
+5. Give it the name you want (the app will reuse it), e.g. "Lampu Kamar".
 
-If you use Google Assistant / Alexa with Bardi, you'll need to re-link via the Smart Life skill/action. That's optional, since the hub will cover it later.
+If you used Google Assistant / Alexa with BARDI, re-link them through Smart Life (optional).
 
-## Step 4: Get the local keys
+## Step 4: Get the keys (5 min)
 
-### Option A: QR login, no developer account (recommended)
+```powershell
+py tools\phase0\get_keys.py
+```
 
-Uses [`tuya-local-key`](https://github.com/vineetchoudhary/tuya-local-key), which wraps Tuya's official device-sharing SDK (the same login Home Assistant uses).
+1. It asks for your **User Code**: in Smart Life, **Me → ⚙️ Settings → Account and Security → User Code**.
+2. A QR code appears in the terminal and in your browser. In Smart Life: **+ (top right) → Scan**, scan it, and **confirm the login** (it may say "Home Assistant", because this uses Home Assistant's official Tuya login). The QR expires after about 2 minutes.
+3. It lists your devices and saves everything to `secrets\devices.json`.
 
-1. Smart Life → **Me → ⚙️ Settings → Account and Security → User Code**. Copy it.
-2. On a computer with Python 3, follow the tool's README (it's `pip install` + run). Enter the User Code.
-3. A QR code appears. In Smart Life: **+ → Scan**, then **Confirm login** (it may say "Home Assistant"). The QR expires in 1–2 min.
-4. You get a list of devices with `id`, `local_key`, `ip`, `category`, `product_id` and the DP **spec**. Save the output **outside this repo** (or in `secrets/`, which is git-ignored).
-
-### Option B: Tuya IoT developer account + TinyTuya wizard
-
-Use this if A fails, or if you also want cloud API access.
+<details>
+<summary>Fallback if that doesn't work: Tuya developer account + TinyTuya wizard</summary>
 
 1. Sign up at [iot.tuya.com](https://iot.tuya.com) (skip "account type").
-2. **Cloud → Create Cloud Project**. Industry *Smart Home*, development method *Smart Home*, data center **Western America** (try **Singapore** if devices don't appear later).
-3. Make sure the **IoT Core** and **Authorization** API services are subscribed. Note the **Access ID** and **Access Secret**.
-4. Project → **Devices → Link Tuya App Account → Add App Account**. Scan the QR with Smart Life (**Me** tab → scan icon). Pick *Automatic* and *Read only status*.
-   Link it under **Devices**, *not* under *Users*. Linking under Users returns 0 devices.
-5. `pip install tinytuya` then `python -m tinytuya wizard`. Enter the Access ID/Secret and a device id, and pick region `us` (or `sg`).
-6. It writes `devices.json` (names, ids, keys) plus `tuya-raw.json` (specs). All of these are git-ignored.
+2. **Cloud → Create Cloud Project**: *Smart Home*, data center **Western America** (try **Singapore** if no devices show up).
+3. Make sure the **IoT Core** and **Authorization** services are subscribed. Note the **Access ID / Secret**.
+4. Project → **Devices → Link Tuya App Account → Add App Account**, and scan with Smart Life. Link it under **Devices**, *not* *Users*.
+5. In the repo folder: `py -m tinytuya wizard` (region `us` or `sg`). It writes `devices.json`. Then use `--devices devices.json` with the probe in Step 5.
 
-The IoT Core plan is a free **trial that expires after ~1 month**. You only need it for this step, and it can be extended later (*Extend trial period*) if you ever need to re-fetch keys.
+The IoT Core plan is a free trial that expires after about a month. You only need it once.
+</details>
 
-## Step 5: Verify local control (10 min)
+## Step 5: Test the lamps + run the checks (10 min)
 
-```bash
-pip install tinytuya
+**Close Smart Life on your phone first** (swipe it away), since a lamp accepts only one local connection at a time. Then:
+
+```powershell
+py tools\phase0\probe.py --effects
 ```
 
-```bash
-python -m tinytuya scan
-```
+What it does:
+1. **Scans** the Wi-Fi for your lamps (~20 s) and finds their IP and protocol version.
+2. **Reads each lamp's full status locally** with its key. This proves local control works.
+3. Runs the checks the app design depends on, asking you a couple of questions:
+   - **Live colour preview:** the lamp sweeps through colours for ~8 s. Answer whether you saw it.
+   - **On-device timer:** ~30 s. The lamp turns off and maybe back on by itself.
+   - **Second connection:** what the lamp does if two apps connect at once (first lamp only).
+   - **Effects** (because of `--effects`): pick a built-in scene/effect on the lamp in Smart Life, close Smart Life, type the effect's name, and repeat for each effect. Press Enter on an empty name to finish.
+4. **Puts the lamp back** how it was.
+5. Writes **`secrets\phase0-report.md`**: DP list, protocol version and check results. **No keys inside.**
 
-You should see each device with its **IP, id and protocol version** (3.3 / 3.4 / 3.5). Close the Smart Life app on your phone first, since a device accepts only one local connection at a time.
+Skip `--effects` if you're short on time. `--only "Kamar"` probes just one lamp.
 
-Then save this as `secrets/probe.py` (git-ignored) and fill in the values:
+## Step 6: Send me the report
 
-```python
-import time
-import tinytuya
+Open `secrets\phase0-report.md` and paste its contents in the chat (or commit it as `docs/devices/bardi-bulb-12w.md`). That's everything needed to start building the lamp code. 🎉
 
-lamp = tinytuya.BulbDevice(
-    dev_id="bfxxxxxxxxxxxxxxxxxx",
-    address="192.168.1.50",
-    local_key="xxxxxxxxxxxxxxxx",
-    version=3.3,           # from the scan
-)
-
-print("status:", lamp.status())   # dumps the raw DPs, e.g. {'20': True, '21': 'white', '22': 1000, ...}
-
-lamp.turn_off(); time.sleep(1)
-lamp.turn_on();  time.sleep(1)
-lamp.set_brightness_percentage(30); time.sleep(1)
-lamp.set_colour(255, 80, 0)        # orange
-time.sleep(2)
-lamp.set_white_percentage(80, 20)  # brightness 80 %, warm-ish
-```
-
-If the lamp toggles, phase 0 is done 🎉
-
-## Step 6: Record each device's DP map (for building profiles)
-
-For every device, copy the `status()` output and the spec section from Step 4 into `docs/devices/<model>.md`. **Remove the `local_key` first.** Example:
-
-```markdown
-# Bardi Smart Bulb RGBWW 12W
-- category: dj · protocol: 3.3 · product_id: keyxxxx
-- DPs: 20 switch_led bool · 21 work_mode enum[white,colour,scene,music] · 22 bright_value_v2 10–1000 · 23 temp_value_v2 0–1000 · 24 colour_data_v2 · 25 scene_data_v2 · 26 countdown_1 0–86400
-```
-
-Those files become the device profiles for the app (and later the hub).
-
-## Step 7: Checks the app design depends on (15 min)
-
-Run these with Smart Life **fully closed** (swipe it away), since it can hold the lamp's only LAN connection. Paste the results into `docs/devices/<model>.md`.
-
-```python
-import time, tinytuya
-lamp = tinytuya.BulbDevice(dev_id="bf…", address="192.168.1.50", local_key="…", version=3.3)
-lamp.set_socketPersistent(True)
-
-# A) Full DP list: look for anything beyond 20–28 (e.g. sleep/wake/rhythm modes)
-print(lamp.status())
-
-# B) Live preview (DP 28): should sweep colours smoothly without changing DP 24
-lamp.set_multiple_values({"20": True, "21": "colour"})
-for h in range(0, 360, 10):
-    lamp.set_value(28, f"0{h:04x}03e803e800000000", nowait=True)
-    time.sleep(0.2)
-print("DP 24 after sweep:", lamp.status()["dps"].get("24"))
-
-# C) Countdown (DP 26): lamp is on, so does it turn off after 10 s?
-lamp.set_value(26, 10); time.sleep(13)
-print("after countdown:", lamp.status()["dps"].get("20"))
-```
-
-**D) Built-in effect strings:** in Smart Life pick each built-in scene/effect on a lamp, close Smart Life, then run `print(lamp.status()["dps"].get("25"))` and note the name → string. The app's effect list gets built from these.
-
-**E) Protocol version:** from the `tinytuya scan` output (3.3 / 3.4 / 3.5).
-
-**F) Second connection** (optional, only matters if two apps will ever share a lamp): run the script above in one terminal, keeping it open with `input()` at the end. In a second terminal, run `print(lamp.status())` with the same settings. Note what happens: the second one fails, **or** it works and the first one gets dropped.
-
-## Step 8: Adding the power strip (later)
+## Step 7: Adding the power strip (later)
 
 1. Buy a Tuya/Smart Life-compatible strip whose sockets are **individually switchable** (check the listing).
 2. Pair it **straight into Smart Life**. No need to go through BARDI.
-3. Re-run Step 4 to fetch its key. Fetching keys again is harmless, only *re-pairing* changes them, so the lamps' keys stay the same.
-4. Test it:
+3. Run `py tools\phase0\get_keys.py` again. Fetching keys again is harmless (only *re-pairing* changes keys).
+4. Run `py tools\phase0\probe.py --only "<strip name>"`. For a strip it only **reads** the status and doesn't switch any sockets.
+5. Send me that report too.
 
-```python
-strip = tinytuya.OutletDevice(dev_id="…", address="192.168.1.60", local_key="…", version=3.3)
-print(strip.status())          # expect DPs 1–4 (sockets), 5 or 7 (USB), 9–13 (countdowns), 38/40/41 (settings)
-strip.turn_on(switch=3); time.sleep(1); strip.turn_off(switch=3)
+## Step 8: Your sister's lamps
+
+Same steps, with her lamps going into **her own Smart Life account** (Smart Life on her iPhone or tablet), and the PC part on your PC:
+
+```powershell
+py tools\phase0\get_keys.py --out secrets\devices-sister.json
 ```
 
-5. Add `docs/devices/<strip-model>.md` with the DP list (no key!).
+```powershell
+py tools\phase0\probe.py --devices secrets\devices-sister.json --out secrets\phase0-report-sister.md
+```
+
+For `get_keys.py`, use *her* User Code and have her scan the QR with her Smart Life. Check first that her tablet runs Android apps ([checklist](../design/household-and-platforms.md#2-huawei-tablet-checklist)).
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
+| Symptom | Likely cause / fix |
 |---|---|
-| Scan finds nothing | PC and devices on different subnets/VLANs, or AP/client isolation is on in the router, or a firewall is blocking UDP 6666/6667/7000 |
-| `status()` returns error 914 / decrypt errors | wrong `local_key` (device re-paired after you fetched keys) or wrong `version` |
-| Error 901 / connection refused | another client holds the single LAN connection (close Smart Life / any other script) |
-| Wizard shows 0 devices | wrong data center, or app account linked under *Users* instead of *Devices* |
-| Keys suddenly stopped working | someone removed/re-added the device. Re-fetch the keys (Step 4) |
+| `py` is not recognized | Python isn't on PATH. Reopen PowerShell, or reinstall with "Add python.exe to PATH" |
+| Smart Life says the QR/login is invalid | wrong User Code, or the QR expired (2 min). Run `get_keys.py` again |
+| Probe: "NOT FOUND on LAN" | Wi-Fi profile is **Public** (set it to Private, Step 0.5), Python was blocked (*Windows Security → Firewall → Allow an app → Python → Private*), PC on a different network/guest Wi-Fi, or the router's AP/client isolation is on |
+| Error "wrong local_key or protocol version" (914) | the lamp was re-paired after you fetched keys. Run `get_keys.py` again |
+| Error "connection refused" (901) | Smart Life (or another script) holds the lamp's single connection. Close it and retry |
+| Fallback wizard shows 0 devices | wrong data center, or app account linked under *Users* instead of *Devices* |
