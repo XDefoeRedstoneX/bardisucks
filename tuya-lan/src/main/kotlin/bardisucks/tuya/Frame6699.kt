@@ -1,5 +1,6 @@
 package bardisucks.tuya
 
+import java.io.InputStream
 import java.nio.ByteBuffer
 
 /** One protocol message. Frames from a device carry a [retcode]; frames we send don't. */
@@ -24,6 +25,7 @@ object Frame6699 {
     const val HEADER_SIZE = 18
     private const val IV_SIZE = 12
     private const val TAG_SIZE = 16
+    private const val MAX_LENGTH = 64 * 1024
 
     fun encode(frame: Frame, key: ByteArray, iv: ByteArray = Crypto.randomBytes(IV_SIZE)): ByteArray {
         require(iv.size == IV_SIZE) { "IV must be $IV_SIZE bytes" }
@@ -43,7 +45,9 @@ object Frame6699 {
     fun totalLength(header: ByteArray): Int {
         val buf = ByteBuffer.wrap(header, 0, HEADER_SIZE)
         if (buf.getInt() != PREFIX) throw TuyaException("Not a 0x6699 frame (unsupported protocol version?)")
-        return HEADER_SIZE + buf.getInt(14) + 4
+        val length = buf.getInt(14)
+        if (length < IV_SIZE + TAG_SIZE || length > MAX_LENGTH) throw TuyaException("Implausible frame length $length")
+        return HEADER_SIZE + length + 4
     }
 
     /** Decrypts a complete frame. Throws [TuyaException] if the key is wrong (GCM tag mismatch). */
@@ -70,3 +74,15 @@ object Frame6699 {
 }
 
 class TuyaException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** Like InputStream.readNBytes (which needs Android 13). Returns fewer bytes only at end of stream. */
+internal fun InputStream.readExactly(count: Int): ByteArray {
+    val buffer = ByteArray(count)
+    var filled = 0
+    while (filled < count) {
+        val n = read(buffer, filled, count - filled)
+        if (n < 0) return buffer.copyOf(filled)
+        filled += n
+    }
+    return buffer
+}

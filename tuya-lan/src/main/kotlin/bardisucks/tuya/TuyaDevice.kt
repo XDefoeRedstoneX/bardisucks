@@ -45,7 +45,7 @@ class TuyaDevice(
     localKey: String,
     val port: Int = 6668,
     private val timeoutMs: Long = 5_000,
-    /** Heartbeat interval that keeps the connection alive; null = no automatic heartbeat. */
+    /** Heartbeat interval; two unanswered heartbeats in a row close the connection. null = no automatic heartbeat. */
     private val keepAliveMs: Long? = 12_000,
 ) : AutoCloseable {
 
@@ -70,6 +70,10 @@ class TuyaDevice(
     val updates: SharedFlow<JsonObject> = _updates
 
     private class Waiter(val cmds: Set<Int>, val reply: CompletableDeferred<Frame>)
+
+    private companion object {
+        const val MAX_MISSED_HEARTBEATS = 2
+    }
 
     suspend fun connect() {
         close()
@@ -96,9 +100,12 @@ class TuyaDevice(
         scope.launch { readLoop(s) }
         keepAliveMs?.let { interval ->
             scope.launch {
+                var missed = 0
                 while (isActive) {
                     delay(interval)
-                    runCatching { heartbeat() }
+                    missed = if (runCatching { heartbeat() }.isSuccess) 0 else missed + 1
+                    // A lamp switched off at the wall never closes its socket; unanswered heartbeats are the only sign.
+                    if (missed >= MAX_MISSED_HEARTBEATS) close()
                 }
             }
         }
@@ -192,10 +199,10 @@ class TuyaDevice(
     }
 
     private fun readFrame(input: InputStream): Frame {
-        val header = input.readNBytes(Frame6699.HEADER_SIZE)
+        val header = input.readExactly(Frame6699.HEADER_SIZE)
         if (header.size < Frame6699.HEADER_SIZE) throw IOException("Connection closed by device")
         val total = Frame6699.totalLength(header)
-        val rest = input.readNBytes(total - Frame6699.HEADER_SIZE)
+        val rest = input.readExactly(total - Frame6699.HEADER_SIZE)
         if (rest.size < total - Frame6699.HEADER_SIZE) throw IOException("Connection closed mid-frame")
         return Frame6699.decode(header + rest, key, hasRetcode = true)
     }

@@ -9,3 +9,4 @@ serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-jso
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
