@@ -2,8 +2,10 @@ package bardisucks.app
 
 import android.app.Application
 import android.os.SystemClock
+import android.util.Log
 import bardisucks.core.home.ConfigStore
 import bardisucks.core.home.HomeController
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,7 +15,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class BardiApp : Application() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // A failed background task (a lamp misbehaving on the network) must never take the whole app down.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> Log.e("bardisucks", "Background task failed", e) },
+    )
     private var disconnect: Job? = null
     private var leftAt = 0L
 

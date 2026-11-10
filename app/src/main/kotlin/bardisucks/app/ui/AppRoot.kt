@@ -126,7 +126,8 @@ private suspend fun importDevices(context: Context, uri: Uri, controller: HomeCo
         } catch (e: ImportException) {
             ImportOutcome.Failed(e.message.orEmpty())
         } catch (e: Exception) {
-            ImportOutcome.Failed(context.getString(R.string.import_unreadable))
+            // Name the cause: on an unfamiliar phone this is how a keystore or file-access problem gets diagnosed.
+            ImportOutcome.Failed(context.getString(R.string.import_unreadable) + "\n(${e.javaClass.simpleName}: ${e.message})")
         }
     }
 

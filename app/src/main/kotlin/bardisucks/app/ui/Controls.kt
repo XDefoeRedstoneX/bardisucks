@@ -241,7 +241,7 @@ fun ColorWheel(
         drawCircle(Brush.sweepGradient(HUES, center), radius)
         drawCircle(Brush.radialGradient(listOf(Color.White, Color.White.copy(alpha = 0f)), center, radius), radius)
         drawCircle(ring, radius, style = Stroke(1.dp.toPx()))
-        if (showThumb || dragged != null) {
+        if (showThumb || dragged != null || released != null) {
             val angle = shown.first * PI / 180
             val distance = shown.second / 100f * radius
             val thumb = center + Offset((cos(angle) * distance).toFloat(), (sin(angle) * distance).toFloat())

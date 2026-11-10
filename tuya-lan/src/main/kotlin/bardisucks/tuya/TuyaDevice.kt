@@ -133,9 +133,7 @@ class TuyaDevice(
     /** Sends without waiting for the reply. Meant for high-rate live preview (DP 28) while a slider moves. */
     suspend fun setNoWait(dps: Map<String, Any?>) {
         val s = socket ?: throw TuyaException("Not connected")
-        withContext(Dispatchers.IO) {
-            send(s, TuyaCommand.CONTROL_NEW, Protocol35.payload(TuyaCommand.CONTROL_NEW, Protocol35.control(toJson(dps), nowSeconds())))
-        }
+        write(s, TuyaCommand.CONTROL_NEW, Protocol35.payload(TuyaCommand.CONTROL_NEW, Protocol35.control(toJson(dps), nowSeconds())))
     }
 
     suspend fun heartbeat() {
@@ -182,11 +180,20 @@ class TuyaDevice(
         val waiter = Waiter(expect, CompletableDeferred())
         waiting.set(waiter)
         try {
-            withContext(Dispatchers.IO) { send(s, cmd, payload) }
+            write(s, cmd, payload)
             withTimeoutOrNull(timeoutMs) { waiter.reply.await() }
                 ?: throw TuyaException("No reply to command 0x${cmd.toString(16)} within $timeoutMs ms")
         } finally {
             waiting.compareAndSet(waiter, null)
+        }
+    }
+
+    /** Sends on the IO dispatcher. A broken socket is reported like every other failure: as a [TuyaException]. */
+    private suspend fun write(s: Socket, cmd: Int, payload: ByteArray) {
+        try {
+            withContext(Dispatchers.IO) { send(s, cmd, payload) }
+        } catch (e: IOException) {
+            throw TuyaException("Connection lost: ${e.message}", e)
         }
     }
 

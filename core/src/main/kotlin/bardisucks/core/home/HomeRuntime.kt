@@ -4,7 +4,6 @@ import bardisucks.core.LightCommand
 import bardisucks.core.LightProfile
 import bardisucks.core.LightState
 import bardisucks.tuya.TuyaDevice
-import bardisucks.tuya.TuyaException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -188,7 +187,9 @@ internal class DeviceSession(
         return try {
             d.set(sent)
             true
-        } catch (e: TuyaException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             d.close()
             false
         }

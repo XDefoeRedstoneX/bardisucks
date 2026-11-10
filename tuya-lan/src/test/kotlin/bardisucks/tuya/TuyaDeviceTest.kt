@@ -69,6 +69,24 @@ class TuyaDeviceTest {
     }
 
     @Test
+    fun `whatever breaks on the wire surfaces as a TuyaException`(): Unit = runBlocking {
+        // Any other exception type (a raw IOException, say) would fail this test, and crash an app.
+        repeat(25) {
+            lamp().use { lamp ->
+                lamp.connect()
+                fake.dropConnections()
+                try {
+                    lamp.set(mapOf("20" to true))
+                    lamp.setNoWait(mapOf("28" to "0000003e803e800000000"))
+                    lamp.set(mapOf("20" to false))
+                } catch (e: TuyaException) {
+                    // expected: the lamp hung up
+                }
+            }
+        }
+    }
+
+    @Test
     fun `wrong local key fails the handshake`() = runBlocking {
         lamp(key = "ffffffffffffffff").use { lamp ->
             assertFailsWith<TuyaException> { lamp.connect() }
