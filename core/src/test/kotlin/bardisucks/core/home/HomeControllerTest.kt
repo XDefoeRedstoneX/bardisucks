@@ -189,7 +189,7 @@ class HomeControllerTest {
         kamar.silent = true
         controller.toggle(kamarLight)
         assertEquals(HomeEvent.NoResponse(listOf("Kamar")), event.await())
-        await { !it.light(kamar).online }
+        await { !it.light(kamar).online && it.light(kamar).unreachable }
         // The other lamp is unaffected, and the group simply works with what is reachable.
         controller.apply(all, LightCommand.Brightness(10))
         awaitLamp(meja) { it.dp("22") == 100 }

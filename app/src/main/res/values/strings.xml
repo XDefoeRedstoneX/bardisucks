@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bardisucks</string>
+
+    <!-- Common -->
+    <string name="back">Back</string>
+    <string name="edit">Edit</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="remove">Remove</string>
+    <string name="ok">OK</string>
+    <string name="turn_on">Turn on</string>
+    <string name="turn_off">Turn off</string>
+    <string name="all_lamps">All lamps</string>
+
+    <!-- Home -->
+    <string name="home_title">Home</string>
+    <string name="section_groups">Groups</string>
+    <string name="section_lamps">Lamps</string>
+    <string name="new_group">New group</string>
+    <string name="pick_a_lamp">Pick a lamp or group on the left</string>
+    <string name="empty_title">No lamps yet</string>
+    <string name="empty_body">Copy the devices.json file made by the PC tools to this device, then import it here. It holds the keys that let the app talk to your lamps directly.</string>
+    <string name="import_devices">Import devices file</string>
+
+    <!-- Lamp and group status -->
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_off">Off</string>
+    <string name="status_no_address">No address</string>
+    <string name="status_reimport">Import again to use</string>
+    <string name="status_on_detail">%1$d%% · %2$s</string>
+    <string name="mode_colour">Colour</string>
+    <string name="mode_effect">Effect</string>
+    <string name="mode_music">Music</string>
+    <string name="white_warm">Warm white</string>
+    <string name="white_neutral">Neutral white</string>
+    <string name="white_cool">Cool white</string>
+    <string name="group_empty">No lamps</string>
+    <string name="group_all_on">On · %1$s</string>
+    <string name="group_some_on">%1$d of %2$d on</string>
+    <plurals name="lamps_off">
+        <item quantity="one">Off · %d lamp</item>
+        <item quantity="other">Off · %d lamps</item>
+    </plurals>
+    <string name="no_response">%s didn\'t respond</string>
+
+    <!-- Lamp / group controls -->
+    <string name="power_on">On</string>
+    <string name="power_off">Off</string>
+    <string name="tap_to_turn_off">Tap to turn off</string>
+    <string name="tap_to_turn_on">Tap to turn on</string>
+    <string name="tab_white">White</string>
+    <string name="tab_colour">Colour</string>
+    <string name="brightness">Brightness</string>
+    <string name="white_tone">White tone</string>
+    <string name="preset_warm">Warm</string>
+    <string name="preset_neutral">Neutral</string>
+    <string name="preset_cool">Cool</string>
+    <string name="swatches">Saved colours</string>
+    <string name="add_swatch">Save this colour</string>
+    <string name="members_title">Lamps in this group</string>
+    <string name="effect_running">The lamp is running an effect. Pick White or Colour to take over.</string>
+    <string name="banner_connecting">Connecting to the lamp…</string>
+    <string name="banner_offline">Can\'t reach this lamp. Check that it has power and that this device is on the home Wi-Fi.</string>
+    <string name="banner_group_offline">Can\'t reach any lamp of this group. Check that they have power and that this device is on the home Wi-Fi.</string>
+    <string name="banner_no_address">This lamp has no address yet. Tap the pencil to set its IP address.</string>
+    <string name="banner_reimport">This lamp\'s key can\'t be read on this device. Import the devices file again.</string>
+
+    <!-- Group editor -->
+    <string name="group_new_title">New group</string>
+    <string name="group_edit_title">Edit group</string>
+    <string name="group_name">Name</string>
+    <string name="group_lamps">Lamps</string>
+    <string name="keep_ratio_title">Keep the difference between lamps</string>
+    <string name="keep_ratio_body">Dimming the group keeps each lamp\'s level relative to the brightest one, instead of setting them all to the same level.</string>
+    <string name="delete_group">Delete group</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_import_body">Add lamps from the devices.json file made by the PC tools. Importing again refreshes keys and addresses and keeps your names and groups.</string>
+    <string name="about_title">About</string>
+    <string name="about_body">Version %1$s. Talks to your lamps directly over your Wi-Fi, without any cloud.</string>
+    <string name="edit_lamp_title">Lamp</string>
+    <string name="lamp_name">Name</string>
+    <string name="lamp_address">IP address</string>
+    <string name="address_invalid">Not an IP address. Example: 192.168.100.133</string>
+    <string name="remove_lamp">Remove lamp</string>
+    <string name="remove_lamp_confirm">Remove %1$s? To add it again you need the devices file.</string>
+
+    <!-- Import -->
+    <string name="import_done_title">Import finished</string>
+    <string name="import_failed_title">Couldn\'t import</string>
+    <string name="import_added">Added: %1$s</string>
+    <string name="import_updated">Updated: %1$s</string>
+    <string name="import_nothing">No lamps were added.</string>
+    <string name="import_skipped_not_light">%1$s: not a lamp (not supported yet)</string>
+    <string name="import_skipped_protocol">%1$s: uses an older protocol version (not supported yet)</string>
+    <string name="import_skipped_no_key">%1$s: no usable key in the file</string>
+    <string name="import_delete_hint">The file contains your lamps\' keys. Delete it from this device now.</string>
+    <string name="import_unreadable">The file couldn\'t be read.</string>
+    <string name="import_too_big">That file is too big to be a devices file.</string>
+</resources>

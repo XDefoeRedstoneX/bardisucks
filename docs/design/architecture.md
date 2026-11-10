@@ -1,6 +1,6 @@
 # Design: architecture
 
-> Status: proposal **v0.4**. **Android only (phones + tablets), no server yet.** Focus is customization, groups and one-tap scenes ([groups-and-scenes.md](groups-and-scenes.md)). Your sister's tablet, Huawei notes and why iOS is parked: [household-and-platforms.md](household-and-platforms.md).
+> Status: **v0.5, partly built** (app v0.1: lamps + groups; see §10). **Android only (phones + tablets), no server yet.** Focus is customization, groups and one-tap scenes ([groups-and-scenes.md](groups-and-scenes.md)). Your sister's tablet, Huawei notes and why iOS is parked: [household-and-platforms.md](household-and-platforms.md).
 > Automations are parked until the mini-PC hub exists ([automations.md](automations.md)).
 > Background: [research/tuya-platform.md](../research/tuya-platform.md).
 
@@ -68,7 +68,7 @@ flowchart LR
 | UI | **Jetpack Compose + Material 3** | modern, easy custom colour wheel/sliders, adaptive layouts for phone **and tablet** |
 | One-tap | `TileService` (6 slots), **Jetpack Glance** widgets, launcher shortcuts, deep links | native Android |
 | Async | kotlinx.coroutines | parallel group fan-out, per-device actors |
-| Storage | **Room** (SQLite) + DataStore | channels, groups, scenes, palettes, settings |
+| Storage | one **JSON document** (`home.json`, kotlinx.serialization, atomic writes) | a home is a handful of lamps, groups and scenes, so a database would be overkill. The same document is the backup/export format and what the hub will read |
 | Secrets | `local_key`s AES-GCM-encrypted with an **Android Keystore** key | keys never leave the device in plaintext |
 | Serialization | kotlinx.serialization | profiles, import/export, backup |
 | Crypto | `javax.crypto` (AES-ECB, AES-GCM, HMAC-SHA256) + `java.util.zip.CRC32` | everything the Tuya protocol needs, no native libs |
@@ -84,7 +84,7 @@ Min SDK 26 (Android 8), target latest. Permissions: `INTERNET`, `ACCESS_WIFI_STA
 ```
 tuya-lan/        plain Kotlin/JVM: Tuya LAN protocol 3.1–3.5, discovery, DeviceConnection
 core/            plain Kotlin: channels, profiles, groups, scenes, effects codec, colour math, import/export
-app/             Android app: Compose UI (phone + tablet layouts), Room, tiles, widgets, shortcuts
+app/             Android app: Compose UI (phone + tablet layouts), Keystore vault, tiles, widgets, shortcuts
 cli/             JVM command-line tool: test tuya-lan against real devices from a laptop
 hub/  (later)    Ktor server on the mini PC, reusing core + tuya-lan; automations live here
 docs/
@@ -188,7 +188,7 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 ## 8. Security
 
 - `local_key`s are encrypted with a non-exportable Android Keystore key, excluded from Android auto-backup, never logged, and shown only after a fingerprint/PIN check.
-- The release APK is signed with **your own signing key**. Keep it backed up outside the repo (`*.jks`/`*.keystore` are git-ignored). Losing it means updates can't install over the old app.
+- For now every build is signed with a **shared key that is in the repository** (`app/signing/`, [why](../../app/signing/README.md)), so a build from GitHub Actions or any PC can update the app without uninstalling it. That key is not a secret: only install APKs from your own builds. Switch to a private key before sharing the app beyond family.
 - **Backup/export** is one file. Keys are included only if you set a passphrase. The same file imports into the hub later.
 - The repo `.gitignore` blocks key files (`devices.json`, `tinytuya.json`, `tuya-raw.json`, `snapshot.json`, `/secrets/`).
 - **Optional later:** put the IoT devices on their own Wi-Fi/VLAN and block their internet access once local control is proven.
@@ -212,8 +212,8 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 |---|---|---|
 | **0. Onboarding** ✅ | lamps moved to Smart Life, keys pulled, local control verified with TinyTuya, DP dumps + checks ([results](../devices/bardi-bulb-12w-rgbww.md)) | done 2026-11-10 |
 | **1. `tuya-lan` + CLI** ✅ (3.5) | Kotlin protocol 3.5, golden tests vs TinyTuya, fake lamp, `bardi` CLI ([guide](../guides/cli.md)) | `bardi color all 200` works on the real lamps *(your test pending)* |
-| **2. App skeleton + lamp control** | import keys, device list, full lamp screen with live colour preview | daily lamp control without BARDI |
-| **3. Rooms & groups** | union capabilities, relative brightness, palette colour, in-sync fan-out | colour + brightness on "All lamps" works |
+| **2. App skeleton + lamp control** ✅ v0.1 | import keys, device list, full lamp screen with live colour preview ([guide](../guides/app.md)) | daily lamp control without BARDI *(your phone test pending)* |
+| **3. Rooms & groups** ◐ v0.1 | done: built-in "All lamps", custom groups, colour/brightness/white on a group, relative brightness, in-sync fan-out. Later: rooms, palette colour | colour + brightness on "All lamps" works *(your phone test pending)* |
 | **4. Power strip** | per-socket channels, all on/off, countdowns, power-on state, child lock, LED | each socket named and grouped |
 | **5. One-tap scenes** | normal/toggle/cycle, partial states, capture current, on-device off-timers | your 3–5 favourite looks are one tap |
 | **6. Android surfaces** | 6 QS tile slots, Glance widgets, launcher shortcuts, deep links | lamps controllable without opening the app |

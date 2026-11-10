@@ -24,8 +24,11 @@ import kotlinx.coroutines.launch
 /** Where and how to reach one device on the LAN. */
 data class DeviceEndpoint(val id: String, val host: String, val port: Int, val localKey: String)
 
-/** What we currently know about one device. */
-data class DeviceSnapshot(val online: Boolean = false, val light: LightState? = null)
+/**
+ * What we currently know about one device. Not [online] and not [unreachable] means a connection attempt is
+ * still under way; [unreachable] means the last attempt failed (it keeps being retried).
+ */
+data class DeviceSnapshot(val online: Boolean = false, val light: LightState? = null, val unreachable: Boolean = false)
 
 /**
  * Holds the LAN connections to a home's lamps while the app is in use, and fans commands out to them.
@@ -127,6 +130,7 @@ internal class DeviceSession(
     private val lock = Any()
     private var job: Job? = null
     @Volatile private var device: TuyaDevice? = null
+    @Volatile private var unreachable = false
     private var dps: Map<String, Any?> = emptyMap()
 
     // Values we just sent, and until when to prefer them over (possibly older) pushes still in flight.
@@ -143,7 +147,10 @@ internal class DeviceSession(
     val light: LightState? get() = synchronized(lock) { profile.read(dps) }
 
     fun start() = synchronized(lock) {
-        if (job?.isActive != true) job = scope.launch { run() }
+        if (job?.isActive != true) {
+            unreachable = false
+            job = scope.launch { run() }
+        }
     }
 
     fun stop() {
@@ -153,6 +160,7 @@ internal class DeviceSession(
         }
         device?.close()
         device = null
+        unreachable = false
         emit()
     }
 
@@ -214,6 +222,7 @@ internal class DeviceSession(
                         val status = d.status().toPlainMap()
                         synchronized(lock) { dps = status }
                         device = d
+                        unreachable = false
                         emit()
                         retryMs = FIRST_RETRY_MS
                         val previews = launch { sendPreviews(d) }
@@ -224,7 +233,8 @@ internal class DeviceSession(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // unreachable, wrong key, timed out...: try again below
+                    // No route, wrong key, timed out...: say so, and try again below.
+                    unreachable = true
                 } finally {
                     device = null
                     opened?.close()
@@ -262,7 +272,7 @@ internal class DeviceSession(
         emit()
     }
 
-    private fun emit() = publish(this, DeviceSnapshot(online, light))
+    private fun emit() = publish(this, DeviceSnapshot(online, light, unreachable && !online))
 
     private companion object {
         const val FIRST_RETRY_MS = 500L

@@ -22,11 +22,12 @@ v2 (later)  📱 Android app ──► 🖥️ mini-PC hub (+ automations, remot
 
 ## Status
 
-🔧 **Phase 1.** Phase 0 is done (both 12 W bulbs: protocol 3.5, local control works, [results](docs/devices/bardi-bulb-12w-rgbww.md)). The Kotlin protocol library `tuya-lan` speaks 3.5 and is tested byte-for-byte against TinyTuya. **Try it on your lamps with the [`bardi` CLI](docs/guides/cli.md)**, e.g. `bardi color all 200`. Next up: the Android app skeleton.
+📱 **App v0.1.** The Android app controls lamps and groups (colour, brightness and white tone on a whole group, all lamps changing together), on phones and tablets. [How to install and use it](docs/guides/app.md). It has been tested on a PC against simulated lamps, the same way the protocol was before it worked on the real bulbs; real-phone testing is the next step. Next up: one-tap scenes.
 
 ```
+app/        Android app (Kotlin, Jetpack Compose): screens, key storage, app lifecycle
+core/       Kotlin: lamp model, groups, live preview, home config, colour / effect encoders
 tuya-lan/   Kotlin: Tuya LAN protocol 3.5 (handshake, AES-GCM frames, status/control/pushes)
-core/       Kotlin: colour / effect / live-preview encoders
 cli/        Kotlin: the `bardi` test tool
 tools/      Python: phase 0 scripts, fake lamp, test-vector generator
 ```
@@ -36,6 +37,7 @@ tools/      Python: phase 0 scripts, fake lamp, test-vector generator
 | Doc | What's in it |
 |---|---|
 | [Research: how Bardi/Tuya devices work](docs/research/tuya-platform.md) | Tuya vs. OEM apps, data points for bulbs and power strips, effect formats, LAN protocol 3.1–3.5, getting local keys |
+| [App guide](docs/guides/app.md) | install the APK, import your lamps, what v0.1 can do, troubleshooting |
 | [BARDI 12 W bulb](docs/devices/bardi-bulb-12w-rgbww.md) | real DP map + verified behaviour (live preview, countdown flips, 2 connections) |
 | [`bardi` CLI guide](docs/guides/cli.md) | build on Windows, control both lamps as a group from the command line |
 | [Phase 0 guide](docs/guides/phase-0-onboarding.md) | Windows walkthrough: move lamps to Smart Life, `get_keys.py` (QR login → keys), `probe.py` (local control test + checks → key-free report) |
@@ -48,8 +50,8 @@ tools/      Python: phase 0 scripts, fake lamp, test-vector generator
 
 0. ✅ Onboarding: lamps off BARDI, keys pulled, local control verified
 1. ✅ `tuya-lan`: Kotlin Tuya LAN protocol 3.5 + `bardi` CLI *(3.3/3.4 + discovery later, if the power strip needs them)*
-2. App skeleton + full lamp control (phone + tablet layouts)
-3. Rooms & groups
+2. ✅ App: full lamp control (phone + tablet layouts) *(v0.1, awaiting your test on a real phone)*
+3. ✅ Groups with colour/brightness *(v0.1; rooms and palette colours later)*
 4. Power strip (per-socket channels)
 5. One-tap scenes
 6. One-tap surfaces (tiles, widgets, shortcuts, tablet dashboard)

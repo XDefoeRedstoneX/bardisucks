@@ -31,6 +31,8 @@ data class LightItem(
     /** Last values the lamp reported; kept while it is offline. Null until it has been reached once. */
     val state: LightState?,
     val problem: LightProblem? = null,
+    /** The last connection attempt failed. Not [online] and not [unreachable] means still connecting. */
+    val unreachable: Boolean = false,
 )
 
 data class GroupItem(
@@ -270,7 +272,7 @@ class HomeController(
                 device.ip.isBlank() -> LightProblem.NO_ADDRESS
                 else -> null
             }
-            LightItem(device.id, device.name, device.ip, snapshot?.online == true, snapshot?.light, problem)
+            LightItem(device.id, device.name, device.ip, snapshot?.online == true, snapshot?.light, problem, snapshot?.unreachable == true)
         }
         val byId = lights.associateBy { it.id }
         val groups = buildList {

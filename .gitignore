@@ -42,6 +42,8 @@ local.properties
 *.aab
 *.jks
 *.keystore
+# ...except the shared build key (password "android", not a secret): see app/signing/README.md
+!/app/signing/shared.keystore
 
 # --- Xcode / iOS ---
 DerivedData/
