@@ -22,13 +22,22 @@ v2 (later)  📱 Android app ──► 🖥️ mini-PC hub (+ automations, remot
 
 ## Status
 
-📐 **Research & design.** No app code yet, only the Phase 0 helper scripts in `tools/phase0/`. Next steps: [Phase 0](docs/guides/phase-0-onboarding.md) (you, on Windows, with the lamps), then the Kotlin protocol library.
+🔧 **Phase 1.** Phase 0 is done (both 12 W bulbs: protocol 3.5, local control works, [results](docs/devices/bardi-bulb-12w-rgbww.md)). The Kotlin protocol library `tuya-lan` speaks 3.5 and is tested byte-for-byte against TinyTuya. **Try it on your lamps with the [`bardi` CLI](docs/guides/cli.md)**, e.g. `bardi color all 200`. Next up: the Android app skeleton.
+
+```
+tuya-lan/   Kotlin: Tuya LAN protocol 3.5 (handshake, AES-GCM frames, status/control/pushes)
+core/       Kotlin: colour / effect / live-preview encoders
+cli/        Kotlin: the `bardi` test tool
+tools/      Python: phase 0 scripts, fake lamp, test-vector generator
+```
 
 ## Docs
 
 | Doc | What's in it |
 |---|---|
 | [Research: how Bardi/Tuya devices work](docs/research/tuya-platform.md) | Tuya vs. OEM apps, data points for bulbs and power strips, effect formats, LAN protocol 3.1–3.5, getting local keys |
+| [BARDI 12 W bulb](docs/devices/bardi-bulb-12w-rgbww.md) | real DP map + verified behaviour (live preview, countdown flips, 2 connections) |
+| [`bardi` CLI guide](docs/guides/cli.md) | build on Windows, control both lamps as a group from the command line |
 | [Phase 0 guide](docs/guides/phase-0-onboarding.md) | Windows walkthrough: move lamps to Smart Life, `get_keys.py` (QR login → keys), `probe.py` (local control test + checks → key-free report) |
 | [Design: architecture](docs/design/architecture.md) | Android app (Kotlin) talking directly to devices, module layout, profiles, connection handling, roadmap, mini-PC plan |
 | [Design: groups, scenes & customization](docs/design/groups-and-scenes.md) | **the v1 focus:** channel/group model, group control rules, scene options, effects, customization, tiles/widgets, wireframes |
@@ -37,8 +46,8 @@ v2 (later)  📱 Android app ──► 🖥️ mini-PC hub (+ automations, remot
 
 ## Roadmap
 
-0. Onboarding: lamps off BARDI, keys pulled, local control verified
-1. `tuya-lan`: Kotlin Tuya LAN protocol + test CLI
+0. ✅ Onboarding: lamps off BARDI, keys pulled, local control verified
+1. ✅ `tuya-lan`: Kotlin Tuya LAN protocol 3.5 + `bardi` CLI *(3.3/3.4 + discovery later, if the power strip needs them)*
 2. App skeleton + full lamp control (phone + tablet layouts)
 3. Rooms & groups
 4. Power strip (per-socket channels)

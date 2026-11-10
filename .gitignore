@@ -35,6 +35,7 @@ Thumbs.db
 
 # --- Kotlin / Gradle / Android ---
 .gradle/
+.kotlin/
 build/
 local.properties
 *.apk

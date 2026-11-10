@@ -60,7 +60,7 @@ groups:
 
 **Why BARDI groups fail at colour and our groups don't:** a lamp in white mode ignores a colour value unless the mode changes in the *same* command. For each member we build one multi-DP frame (`work_mode=colour` + `colour_data` + `switch_led=true`) and send all members **in parallel** over their own connections. They change within ~100 ms of each other.
 
-**Smooth dragging:** while your finger is on the colour wheel or brightness slider, the app sends Tuya's real-time `control_data` DP (meant for "live preview while dragging"), throttled to ~5 updates/s per lamp. On release it sends the final `colour_data` / `bright_value` so the state sticks. *(Phase 0 check: confirm the Bardi bulb accepts DP 28.)*
+**Smooth dragging:** while your finger is on the colour wheel or brightness slider, the app sends Tuya's real-time `control_data` DP (meant for "live preview while dragging"), throttled to ~5 updates/s per lamp. On release it sends the final `colour_data` / `bright_value` so the state sticks. *(Verified on the BARDI bulbs in phase 0.)*
 
 **Mixed-state display:** the group tile shows a split swatch of member colours. The slider shows the range (e.g. "30–80 %") until you touch it.
 
@@ -95,7 +95,7 @@ steps:
 | `color` | HSV · hex · a palette colour · `random` · `random_from: <palette>` |
 | `effect` | built-in (night, read, rainbow, …) or one of your custom effects (§5) |
 | `transition` | `instant` / `smooth` (uses the bulb's own gradient). Long fades (minutes) need the hub, so later |
-| `then_off_after` | 1 min – 24 h, on-device countdown |
+| `then_off_after` | 1 min – 24 h, on-device countdown. The BARDI countdown **flips** power, so the editor only allows it when the step leaves the lamp on. The app also clears any pending countdown (DP 26 = 0) whenever it switches a lamp itself, so an old timer can't turn it back on |
 
 ### Scene styles
 

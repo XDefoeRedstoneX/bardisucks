@@ -123,6 +123,12 @@ def main() -> None:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    if out.exists():  # keep LAN IPs that probe.py saved earlier
+        old = {d["id"]: d for d in json.loads(out.read_text(encoding="utf-8")).get("devices", [])}
+        for d in devices:
+            for field in ("lan_ip", "version"):
+                if field in old.get(d["id"], {}):
+                    d[field] = old[d["id"]][field]
     out.write_text(json.dumps({"devices": devices}, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # End this login session again; we only needed it once.

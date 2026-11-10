@@ -22,7 +22,7 @@ Non-goals for v1: automations/schedules (→ hub), remote control away from home
 
 Without automations, nothing has to run 24/7, so we don't need a server yet. The app on each phone/tablet opens the encrypted LAN connection to each of *its* lamps/strip itself.
 
-The one Tuya constraint to respect is **one LAN connection per device**. The app holds connections only while it's on screen and releases them shortly after you leave. Widgets and tiles connect, send and disconnect (§6).
+Many Tuya devices accept only **one LAN connection at a time**. The BARDI 12 W bulbs accept at least two ([device file](../devices/bardi-bulb-12w-rgbww.md)), but the app still holds connections only while it's on screen and releases them shortly after you leave. Widgets and tiles connect, send and disconnect (§6).
 
 ### 2.2 Native Android (Kotlin), not a web app
 
@@ -103,7 +103,7 @@ Full details in [groups-and-scenes.md §2](groups-and-scenes.md#2-model). In sho
 The UI and scene engine never touch raw DP numbers. A profile maps capabilities to DPs, and ships as JSON inside `core`:
 
 ```yaml
-id: tuya-light-rgbcw-v2           # BARDI 12 W RGB+WW (verify in phase 0)
+id: tuya-light-rgbcw-v2           # BARDI 12 W RGB+WW, product omurhjizrsia38ec (verified in phase 0)
 match: { category: dj, has_dps: [20, 21, 22, 23, 24] }
 channels:
   - kind: light
@@ -114,7 +114,8 @@ channels:
     color:      { dp: 24, codec: hsv12 }            # HHHHSSSSVVVV
     effect:     { dp: 25, codec: tuya_scene }       # see research §2.3
     live:       { dp: 28, codec: control21 }        # drag preview
-    countdown:  { dp: 26, unit: s, max: 86399 }
+    countdown:  { dp: 26, unit: s, max: 86400, flips: true }   # ends by flipping power
+    settings:   { do_not_disturb: { dp: 34 } }                 # stay off after a power cut
 ```
 
 ```yaml
@@ -148,7 +149,7 @@ A Kotlin port of what TinyTuya does, built in this order:
 3. **Commands:** `CONTROL` (`0x07`) / `CONTROL_NEW` (`0x0d`), `DP_QUERY` (`0x0a`) / `DP_QUERY_NEW` (`0x10`), `STATUS` push (`0x08`), `HEART_BEAT` (`0x09`), `UPDATEDPS` (`0x12`).
 4. **Discovery:** listen on UDP 6666/6667 and probe UDP 7000 (3.5) to learn IP and version. On a shared Wi-Fi this also hears *other people's* Tuya devices, so the app only lists devices it has a key for. The rest show up under "Other devices on this network", hidden by default.
 
-We only build the protocol versions the Bardi devices actually report (phase 0 scan) first. The rest come later.
+Phase 0 showed the BARDI 12 W bulbs speak **3.5**, so 3.5 was built first and is done (`tuya-lan/`: 0x6699 frames, session handshake, query/control/heartbeat/pushes, golden-tested byte-for-byte against TinyTuya). 3.3/3.4 and UDP discovery come when a device needs them (likely the power strip).
 
 **Testing:**
 - **Golden tests:** TinyTuya on a laptop produces frames for a known key/payload/nonce. Our encoder has to produce identical bytes, and our decoder has to parse TinyTuya's.
@@ -200,7 +201,7 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 | Phone off / away | lamps and strip still work by hand and via Smart Life (cloud). On-device countdowns still fire |
 | Smart Life open on another phone at the same time | that phone uses cloud control, which works fine. If it grabbed the LAN slot, our app retries |
 | You + sister on the same Wi-Fi, different lamps | no conflict: each app only connects to its own lamps |
-| Two apps controlling the *same* lamp (only if you share devices later) | polite mode releases idle connections. Tapping at the same instant means one retries. The hub removes this entirely |
+| Two apps controlling the *same* lamp (only if you share devices later) | fine on the BARDI bulbs (2 connections verified). For devices that refuse a second connection, polite mode releases idle connections and the app retries. The hub removes this entirely |
 | Device IP changes | discovery finds it again. Still set DHCP reservations |
 | Device re-paired in Smart Life | key changed, so the app shows **Re-import key** |
 | Power cut | the strip follows its power-on setting (DP 38: on/off/memory), and bulbs follow their own power-on behaviour |
@@ -209,8 +210,8 @@ The one-time key fetch happens on a laptop ([phase 0 guide](../guides/phase-0-on
 
 | Phase | Deliverable | Done when |
 |---|---|---|
-| **0. Onboarding** | lamps moved to Smart Life, keys pulled, local control verified with TinyTuya, DP dumps + checks from [research §7](../research/tuya-platform.md#7-open-questions-to-check-on-your-devices) | a Python probe toggles both lamps |
-| **1. `tuya-lan` + CLI** | Kotlin protocol for the version(s) your lamps use, golden tests, CLI | `cli toggle lamp-1` works from a laptop |
+| **0. Onboarding** ✅ | lamps moved to Smart Life, keys pulled, local control verified with TinyTuya, DP dumps + checks ([results](../devices/bardi-bulb-12w-rgbww.md)) | done 2026-11-10 |
+| **1. `tuya-lan` + CLI** ✅ (3.5) | Kotlin protocol 3.5, golden tests vs TinyTuya, fake lamp, `bardi` CLI ([guide](../guides/cli.md)) | `bardi color all 200` works on the real lamps *(your test pending)* |
 | **2. App skeleton + lamp control** | import keys, device list, full lamp screen with live colour preview | daily lamp control without BARDI |
 | **3. Rooms & groups** | union capabilities, relative brightness, palette colour, in-sync fan-out | colour + brightness on "All lamps" works |
 | **4. Power strip** | per-socket channels, all on/off, countdowns, power-on state, child lock, LED | each socket named and grouped |

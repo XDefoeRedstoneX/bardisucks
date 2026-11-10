@@ -13,7 +13,7 @@ Wi-Fi ─┬─ 💡💡 your lamps (+ strip)  ◄── your phone (only has yo
        └─ 💡   her lamps             ◄── her tablet  (only has her keys)
 ```
 
-- **Each app only knows the devices it has keys for.** Her tablet never connects to your lamps and vice versa, so the one-connection-per-lamp limit never causes conflicts.
+- **Each app only knows the devices it has keys for.** Her tablet never connects to your lamps and vice versa. (And even if you shared lamps later, the BARDI bulbs accept two connections at once, as verified in phase 0.)
 - **Discovery hears everyone's devices** on a shared Wi-Fi. Devices without a key are listed under *Other devices on this network* (hidden by default), so she won't see your lamps cluttering her app.
 - **Getting her keys:**
   - **Recommended: her own Smart Life account.** She moves her lamps out of the BARDI app into *her* Smart Life account. She can use her iPhone for this, since Smart Life is on the App Store, or the tablet (Smart Life is reportedly on Huawei AppGallery). Then you run the key fetch on your laptop with *her* User Code, she scans the QR with her Smart Life, and you send her tablet the export.

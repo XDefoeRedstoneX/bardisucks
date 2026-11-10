@@ -125,7 +125,7 @@ M = 0 direct · 1 gradient
 
 **`colour_data` (DP 24):** `HHHHSSSSVVVV` (12 hex chars, H 0–360, S/V 0–1000). The cloud may call this `colour_data` or `colour_data_v2` depending on the product, but the local format is the same.
 
-**Countdown (DP 26):** seconds, 0–86399 on the tuya-local generic bulb. **[test]** Check whether it turns the lamp *off* or *inverts* it when it ends. Most Tuya firmware flips the switch, so "off after 30 min" only makes sense on a lamp that's on.
+**Countdown (DP 26):** seconds (0–86400 per the BARDI spec). **[verified on BARDI 12 W]** It **flips** the switch when it ends (on→off and off→on), so "off after 30 min" only makes sense on a lamp that's on.
 
 **Optional on-bulb schedules** (newer firmware only, Base64 raw DPs): `rhythm_mode` (circadian colour schedule), `sleep_mode` (fade out at a time), `wakeup_mode` (sunrise fade at a time). These run **on the bulb**, so no server is needed, but the bulb needs correct time from Tuya's cloud. **[test]** Check whether the Bardi 12 W has them.
 
@@ -150,7 +150,7 @@ Reverse-engineered by the community and implemented by [TinyTuya](https://github
 - **UDP 7000**: v3.5 discovery. The client broadcasts a request and the device replies unicast.
 
 **Connection behaviour**
-- **Only one TCP connection per device at a time.** **[verified]** The hub has to be the single owner of each device's LAN connection. Phones running the Tuya app will then fall back to cloud control. That works, it's just slower.
+- **Concurrent connections:** TinyTuya documents *one TCP connection at a time* for Tuya devices in general. **But the BARDI 12 W bulbs (protocol 3.5) accepted two simultaneous connections in phase 0** **[verified]**. Don't assume this for other devices (e.g. the power strip), so the app still handles a refused connection.
 - Hold the socket open (`set_socketPersistent(True)`), send a **heartbeat** about every 12 s, and the device **pushes status updates** (command `0x08`) whenever something changes, including a physical button press on a plug. That gives us real-time state without polling.
 - On 3.4/3.5 any disconnect means a new handshake, so keep connections alive.
 - Don't poll faster than ~1/s. Send several DP changes in one message (`set_multiple_values`) instead of many small ones.
@@ -200,6 +200,8 @@ Most current Tuya Wi-Fi bulbs and plugs use **Beken BK7231T/N** modules (WB2L, C
 For this project, firmware replacement is **optional**. The hub's driver layer should leave room for an "OpenBeken/MQTT" driver later, but the main plan works with stock firmware.
 
 ## 7. Open questions to check on your devices
+
+> **Lamps: answered in phase 0** ([device file](../devices/bardi-bulb-12w-rgbww.md)): pair fine with Smart Life, protocol **3.5**, DP 28 live preview works, countdown flips, two connections OK, no sleep/wake/rhythm DPs. Still open: effect preset strings (only "night" captured), and everything about the power strip.
 
 1. Do the Bardi lamps pair with Smart Life without trouble? (Very likely yes.)
 2. Can the BARDI app's scanner confirm a `tuya-local-key` QR login? (If it can, you can skip re-pairing. It probably can't.)

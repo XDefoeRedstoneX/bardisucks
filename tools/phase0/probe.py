@@ -60,6 +60,22 @@ def scan(devices: list[dict], seconds: int) -> dict:
     return {dev_id: info for dev_id, info in found.items() if info.get("ip")}
 
 
+def save_lan_info(path: Path, found: dict) -> None:
+    """Remember each device's LAN IP and protocol version in the devices file (used by the bardi CLI/app)."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or "devices" not in data:
+        return  # TinyTuya's devices.json: leave it alone
+    updated = 0
+    for d in data["devices"]:
+        net = found.get(d.get("id"))
+        if net:
+            d["lan_ip"], d["version"] = net["ip"], str(net.get("version") or "3.5")
+            updated += 1
+    if updated:
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Saved LAN IP + protocol version of {updated} device(s) to {path}")
+
+
 def connect(dev: dict, ip: str, version: str) -> tinytuya.Device:
     d = tinytuya.Device(dev["id"], ip, dev["local_key"], version=float(version))
     d.set_socketPersistent(True)
@@ -239,6 +255,7 @@ def main() -> None:
         sys.exit("No devices with a local key to probe.")
 
     found = scan(devices, args.scan_seconds)
+    save_lan_info(path, found)
     sections, done_second_conn = [], []
     for dev in devices:
         try:
