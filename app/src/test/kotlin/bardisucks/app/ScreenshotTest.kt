@@ -16,7 +16,6 @@ import bardisucks.app.ui.AppContent
 import bardisucks.app.ui.AppIcons
 import bardisucks.app.ui.BardiTheme
 import bardisucks.app.ui.GroupEditorScreen
-import bardisucks.app.ui.SettingsScreen
 import bardisucks.core.home.HomeState
 import bardisucks.core.home.Target
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -44,14 +43,25 @@ class ScreenshotTest {
     }
 
     @Composable
-    private fun App(state: HomeState = Samples.home, open: Target? = null) =
-        AppContent(state, Samples.noActions, Samples.noEdits, "0.1.0", remember { SnackbarHostState() }, onImport = {}, initial = open)
+    private fun App(state: HomeState = Samples.home, open: Target? = null, scene: String? = null, settings: Boolean = false) =
+        AppContent(
+            state, Samples.noActions, Samples.noEdits, "0.2.0", remember { SnackbarHostState() }, onImport = {},
+            onAddTile = {}, initial = open, initialScene = scene, openSettings = settings,
+        )
 
     @Test fun home() = shoot("home") { App() }
 
     @Test fun homeLight() = shoot("home_light", dark = false) { App() }
 
     @Test fun homeEmpty() = shoot("home_empty") { App(HomeState()) }
+
+    @Test fun homeNoScenes() = shoot("home_no_scenes") { App(Samples.noScenes) }
+
+    @Test fun sceneEditor() = shoot("scene_editor") { App(scene = Samples.night.id) }
+
+    @Test fun sceneEditorCycle() = shoot("scene_editor_cycle") { App(scene = Samples.cycle.id) }
+
+    @Test fun sceneEditorNew() = shoot("scene_editor_new", dark = false) { App(scene = "") }
 
     @Test fun lampColour() = shoot("lamp_colour") { App(open = Target.Light(Samples.kamar.id)) }
 
@@ -67,9 +77,7 @@ class ScreenshotTest {
         GroupEditorScreen(Samples.desk, Samples.home.lights, onSave = { _, _, _ -> }, onDelete = {}, onBack = {})
     }
 
-    @Test fun settings() = shoot("settings") {
-        SettingsScreen(Samples.home.lights, "0.1.0", onImport = {}, onEditLight = {}, onBack = {})
-    }
+    @Test fun settings() = shoot("settings") { App(settings = true) }
 
     @Test
     @Config(qualifiers = TABLET)

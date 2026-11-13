@@ -19,6 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -38,13 +39,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import bardisucks.app.R
+import bardisucks.core.home.Action
 import bardisucks.core.home.GroupItem
+import bardisucks.core.home.HomeState
+import bardisucks.core.home.Target
 import bardisucks.core.home.ImportSummary
 import bardisucks.core.home.LightItem
 import bardisucks.core.home.SkipReason
@@ -146,14 +151,19 @@ fun GroupEditorScreen(
 
 @Composable
 fun SettingsScreen(
-    lights: List<LightItem>,
+    state: HomeState,
     version: String,
     onImport: () -> Unit,
     onEditLight: (LightItem) -> Unit,
+    onBindTile: (slot: Int, action: Action?) -> Unit,
+    /** Asks the system to add the tile to Quick Settings; null where Android can't (before Android 13). */
+    onAddTile: ((slot: Int) -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val lights = state.lights
     val scheme = MaterialTheme.colorScheme
+    var pickingSlot by remember { mutableStateOf<Int?>(null) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -197,10 +207,92 @@ fun SettingsScreen(
                 Text(stringResource(R.string.import_devices))
             }
             Spacer(Modifier.size(12.dp))
+            Text(stringResource(R.string.tiles_title), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
+            Text(stringResource(R.string.tiles_body), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer) {
+                Column {
+                    for (slot in 1..TILE_SLOTS) {
+                        val action = state.tiles[slot]
+                        Row(
+                            Modifier.fillMaxWidth().clickable { pickingSlot = slot }.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp).testTag("tileSlot:$slot"),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.tile_n, slot), style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    action?.let { state.actionLabel(it) } ?: stringResource(R.string.tile_unused),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (action != null && onAddTile != null) {
+                                TextButton(onClick = { onAddTile(slot) }) { Text(stringResource(R.string.tile_add)) }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.size(12.dp))
             Text(stringResource(R.string.about_title), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
             Text(stringResource(R.string.about_body, version), style = MaterialTheme.typography.bodyMedium)
         }
     }
+
+    pickingSlot?.let { slot ->
+        ActionPicker(
+            state = state,
+            title = stringResource(R.string.tile_n, slot),
+            current = state.tiles[slot],
+            onPick = { action ->
+                pickingSlot = null
+                onBindTile(slot, action)
+            },
+            onDismiss = { pickingSlot = null },
+        )
+    }
+}
+
+const val TILE_SLOTS = 6
+
+/** "Scene: Movie", "Switch: All lamps"... */
+@Composable
+fun HomeState.actionLabel(action: Action): String {
+    val name = actionName(action) ?: return stringResource(R.string.missing_target)
+    return when (action) {
+        is Action.RunScene -> stringResource(R.string.action_scene, name)
+        is Action.Switch -> stringResource(R.string.action_switch, name)
+    }
+}
+
+/** Pick what a tile does: nothing, a scene, or switching a group or lamp. */
+@Composable
+fun ActionPicker(state: HomeState, title: String, current: Action?, onPick: (Action?) -> Unit, onDismiss: () -> Unit) {
+    val options = buildList<Action?> {
+        add(null)
+        state.scenes.forEach { add(Action.RunScene(it.id)) }
+        state.groups.forEach { add(Action.Switch(Target.Group(it.id))) }
+        state.lights.forEach { add(Action.Switch(Target.Light(it.id))) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                for (option in options) {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onPick(option) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == current, onClick = null, modifier = Modifier.padding(8.dp))
+                        Text(option?.let { state.actionLabel(it) } ?: stringResource(R.string.tile_unused), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 /** Rename a lamp, fix its address, or remove it. */

@@ -304,6 +304,12 @@ class HomeController(
         }
     }
 
+    /** True if at least one lamp that [action] involves is connected. */
+    fun isReachable(action: Action): Boolean {
+        val needed = lampsFor(action)
+        return current().lights.any { it.id in needed && it.online }
+    }
+
     /** A look with one step per lamp, matching how [lampIds] (default: every reachable lamp) look right now. */
     fun captureLook(lampIds: List<String>? = null): SceneLook {
         val lamps = current().lights.filter { (lampIds == null || it.id in lampIds) && it.online && it.state != null }

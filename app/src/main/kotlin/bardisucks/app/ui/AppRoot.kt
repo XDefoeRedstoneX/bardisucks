@@ -37,7 +37,11 @@ import bardisucks.app.R
 import bardisucks.core.home.HomeController
 import bardisucks.core.home.HomeEvent
 import bardisucks.core.home.HomeState
+import bardisucks.core.home.Action
 import bardisucks.core.home.ImportException
+import bardisucks.core.home.SceneConfig
+import bardisucks.core.home.SceneLook
+import bardisucks.core.home.StarterNames
 import bardisucks.core.home.Swatch
 import bardisucks.core.home.Target
 import kotlinx.coroutines.Dispatchers
@@ -58,8 +62,16 @@ class HomeEdits(
 private sealed interface Screen {
     data class Light(val target: Target) : Screen
     data class EditGroup(val id: String?) : Screen
+    /** [id] null: a new scene. */
+    data class EditScene(val id: String?) : Screen
     data object Settings : Screen
 }
+
+/** What only the Android side can do; null where this phone can't. */
+class PlatformHooks(
+    val pinScene: ((SceneConfig) -> Unit)? = null,
+    val addTile: ((Int) -> Unit)? = null,
+)
 
 /** From this width on (tablets, landscape) the home screen stays visible next to whatever is opened. */
 private val TWO_PANE_WIDTH = 840.dp
@@ -69,7 +81,7 @@ private const val MAX_IMPORT_BYTES = 2_000_000
 
 /** The app wired to its [controller]: live state, the file picker, and messages. */
 @Composable
-fun AppRoot(controller: HomeController, version: String) {
+fun AppRoot(controller: HomeController, version: String, platform: PlatformHooks = PlatformHooks(), openSettings: Boolean = false) {
     val state by controller.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -101,6 +113,20 @@ fun AppRoot(controller: HomeController, version: String) {
         snackbar = snackbar,
         // Some file managers label .json files oddly, so don't filter by type.
         onImport = { picker.launch(arrayOf("*/*")) },
+        scenes = remember(controller) {
+            SceneEdits(
+                save = controller::saveScene,
+                delete = controller::deleteScene,
+                capture = { controller.captureLook() },
+                tryLook = { controller.tryLook(it) },
+                pin = platform.pinScene,
+            )
+        },
+        onRunScene = { controller.runScene(it) },
+        onAddStarterScenes = { controller.addStarterScenes(starterNames(context)) },
+        onBindTile = controller::bindTile,
+        onAddTile = platform.addTile,
+        openSettings = openSettings,
     )
     importOutcome?.let { ImportResultDialog(it, onDismiss = { importOutcome = null }) }
 }
@@ -140,10 +166,24 @@ fun AppContent(
     version: String,
     snackbar: SnackbarHostState,
     onImport: () -> Unit,
+    scenes: SceneEdits = SceneEdits({ "" }, {}, { SceneLook() }, {}, null),
+    onRunScene: (String) -> Unit = {},
+    onAddStarterScenes: () -> Unit = {},
+    onBindTile: (Int, Action?) -> Unit = { _, _ -> },
+    onAddTile: ((Int) -> Unit)? = null,
     /** Which lamp or group to open at start (used by previews and tests). */
     initial: Target? = null,
+    /** Which scene's editor to open at start ("" for a new scene; used by previews and tests). */
+    initialScene: String? = null,
+    openSettings: Boolean = false,
 ) {
-    val stack = remember { mutableStateListOf<Screen>().apply { if (initial != null) add(Screen.Light(initial)) } }
+    val stack = remember {
+        mutableStateListOf<Screen>().apply {
+            if (initial != null) add(Screen.Light(initial))
+            if (initialScene != null) add(Screen.EditScene(initialScene.ifEmpty { null }))
+            if (openSettings) add(Screen.Settings)
+        }
+    }
     var editingLight by remember { mutableStateOf<String?>(null) }
     fun back() {
         if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
@@ -173,6 +213,12 @@ fun AppContent(
                     stack += Screen.Settings
                 },
                 onImport = onImport,
+                onRunScene = onRunScene,
+                onEditScene = { id ->
+                    if (twoPane) stack.clear()
+                    stack += Screen.EditScene(id)
+                },
+                onAddStarterScenes = onAddStarterScenes,
                 modifier = modifier,
             )
 
@@ -224,11 +270,27 @@ fun AppContent(
                             modifier = modifier,
                         )
                     }
+                    is Screen.EditScene -> {
+                        val existing = screen.id?.let { id -> state.scenes.firstOrNull { it.id == id }?.config }
+                        if (screen.id != null && existing == null) {
+                            LaunchedEffect(screen) { stack.remove(screen) } // the scene was deleted
+                        } else {
+                            SceneEditorScreen(
+                                initial = existing ?: remember(screen) { newSceneDraft(state) },
+                                state = state,
+                                edits = scenes,
+                                onDone = { stack.remove(screen) },
+                                modifier = modifier,
+                            )
+                        }
+                    }
                     Screen.Settings -> SettingsScreen(
-                        lights = state.lights,
+                        state = state,
                         version = version,
                         onImport = onImport,
                         onEditLight = { editingLight = it.id },
+                        onBindTile = onBindTile,
+                        onAddTile = onAddTile,
                         onBack = ::back,
                         modifier = modifier,
                     )
@@ -277,3 +339,19 @@ fun AppContent(
         )
     }
 }
+
+/** The starter scenes' names in the phone's language. */
+fun starterNames(context: Context) = StarterNames(
+    bright = context.getString(R.string.starter_bright),
+    evening = context.getString(R.string.starter_evening),
+    night = context.getString(R.string.starter_night),
+    movie = context.getString(R.string.starter_movie),
+    allOff = context.getString(R.string.starter_all_off),
+    cycle = context.getString(R.string.starter_cycle),
+    cycleLooks = listOf(
+        context.getString(R.string.starter_bright),
+        context.getString(R.string.starter_look_warm),
+        context.getString(R.string.starter_look_night),
+        context.getString(R.string.starter_look_off),
+    ),
+)

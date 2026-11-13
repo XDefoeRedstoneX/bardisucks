@@ -1,7 +1,7 @@
 # Design: groups, one-tap scenes & customization
 
 > Status: proposal v0.2, **partly built**. **This is the v1 focus.** Automations are parked until the mini-PC hub exists ([automations.md](automations.md)).
-> In app v0.1 ([guide](../guides/app.md)): groups with power, brightness (absolute or keep-ratio), white tone and colour, live preview while dragging, saved colours. Not yet: palette colour across a group, scenes (§4), effects (§5), rooms and most of §6, tiles/widgets (§7), the power strip.
+> Built so far (app v0.2, [guide](../guides/app.md)): groups with power, brightness (absolute or keep-ratio), white tone and colour, live preview while dragging, saved colours; scenes with normal/toggle/cycle styles, partial steps, capture, on-device off-timers, starter scenes; 6 Quick Settings tile slots, launcher and pinned shortcuts. Not yet: palette colour across a group, scene transitions/random colours, effects (§5), rooms and most of §6, widgets, deep links for Tasker/NFC, the power strip.
 > Context: [architecture.md](architecture.md) · [sister's tablet & platforms](household-and-platforms.md) · [research](../research/tuya-platform.md)
 > Devices in scope: **2× BARDI 12 W RGB+WW bulbs** now, plus a **4-socket smart power strip** (extension cord) later.
 

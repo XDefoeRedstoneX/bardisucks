@@ -4,6 +4,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import bardisucks.app.ui.AppRoot
@@ -98,6 +100,52 @@ class AppFlowTest {
         // The power row of the group turns everything off.
         compose.onNodeWithTag("powerRow").performClick()
         waitFor("both lamps off") { kamar.dp("20") == false && meja.dp("20") == false }
+    }
+
+    @Test
+    fun scenesRunWithOneTapAndToggleBack() {
+        importAndStart()
+        controller.addStarterScenes()
+        compose.setContent { BardiTheme(dynamicColor = false) { AppRoot(controller, "test") } }
+        waitFor("starter scenes shown") { controller.state.value.scenes.size == 6 }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("scene:All off").performClick()
+        waitFor("both lamps off") { kamar.dp("20") == false && meja.dp("20") == false }
+
+        // Movie is a toggle: on, then back to exactly how it was (both off).
+        compose.onNodeWithTag("scene:Movie").performClick()
+        waitFor("movie colours") { kamar.dp("20") == true && kamar.dp("21") == "colour" && meja.dp("21") == "colour" }
+        waitFor("movie shown as on") { controller.state.value.scenes.first { it.name == "Movie" }.toggledOn }
+        compose.onNodeWithTag("scene:Movie").performClick()
+        waitFor("back off") { kamar.dp("20") == false && meja.dp("20") == false }
+    }
+
+    @Test
+    fun aNewSceneCanBeMadeFromHowTheLampsLookNow() {
+        importAndStart()
+        compose.setContent { BardiTheme(dynamicColor = false) { AppRoot(controller, "test") } }
+        compose.onNodeWithText("Add starter scenes").assertExists()
+        compose.onNodeWithText("New scene").performClick()
+        compose.onNodeWithTag("sceneName").performTextInput("Reading")
+        compose.onNodeWithText("Use how lamps look now").performScrollTo().performClick()
+        compose.onNodeWithTag("saveScene").performScrollTo().performClick()
+        waitFor("scene saved") { controller.state.value.scenes.any { it.name == "Reading" } }
+        val look = controller.state.value.scenes.single().config.looks.single()
+        assertEquals(listOf(kamar.id, meja.id).map { "light:$it" }, look.actions.map { it.target })
+        assertEquals(listOf(100, 40), look.actions.map { it.brightness })
+    }
+
+    private fun importAndStart() {
+        controller.importDevices(
+            """{"devices": [
+                {"id": "${kamar.id}", "name": "Kamar", "local_key": "${kamar.key}", "category": "dj", "lan_ip": "127.0.0.1", "version": "3.5"},
+                {"id": "${meja.id}", "name": "Meja", "local_key": "${meja.key}", "category": "dj", "lan_ip": "127.0.0.1", "version": "3.5"}
+            ]}""",
+        )
+        store.update { c -> c.copy(devices = c.devices.map { it.copy(port = if (it.id == kamar.id) kamar.port else meja.port) }) }
+        controller.start()
+        waitFor("both lamps online") { controller.state.value.lights.let { it.size == 2 && it.all { lamp -> lamp.online } } }
     }
 
     private object PlainVault : KeyVault {

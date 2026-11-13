@@ -23,5 +23,34 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Runs a scene from a shortcut without showing anything. -->
+        <activity
+            android:name=".outside.RunActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Six Quick Settings tiles; each is bound to a scene, group or lamp in the app's Settings. -->
+        <service android:name=".outside.Tile1" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_1" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <service android:name=".outside.Tile2" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_2" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <service android:name=".outside.Tile3" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_3" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <service android:name=".outside.Tile4" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_4" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <service android:name=".outside.Tile5" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_5" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <service android:name=".outside.Tile6" android:exported="true" android:icon="@drawable/ic_tile" android:label="@string/tile_name_6" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
     </application>
 </manifest>

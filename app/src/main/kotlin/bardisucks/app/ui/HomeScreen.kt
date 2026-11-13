@@ -1,10 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package bardisucks.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -50,6 +54,7 @@ import bardisucks.app.R
 import bardisucks.core.home.GroupItem
 import bardisucks.core.home.HomeState
 import bardisucks.core.home.LightItem
+import bardisucks.core.home.SceneItem
 import bardisucks.core.home.Target
 
 @Composable
@@ -62,6 +67,10 @@ fun HomeScreen(
     onNewGroup: () -> Unit,
     onSettings: () -> Unit,
     onImport: () -> Unit,
+    onRunScene: (String) -> Unit = {},
+    /** Null id: a new scene. */
+    onEditScene: (String?) -> Unit = {},
+    onAddStarterScenes: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -86,6 +95,21 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                SectionHeader(stringResource(R.string.section_scenes)) {
+                    TextButton(onClick = { onEditScene(null) }) {
+                        Icon(AppIcons.Add, null, Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text(stringResource(R.string.new_scene))
+                    }
+                }
+            }
+            if (state.scenes.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { NoScenes(onAddStarterScenes) }
+            }
+            items(state.scenes, key = { "scene:${it.id}" }) { scene ->
+                SceneTile(scene, state, onRun = { onRunScene(scene.id) }, onEdit = { onEditScene(scene.id) })
+            }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(stringResource(R.string.section_groups)) {
                     TextButton(onClick = onNewGroup) {
@@ -129,6 +153,81 @@ fun HomeScreen(
 }
 
 private val LightItem.isLit: Boolean get() = online && state?.on == true
+
+/** Tap to run, hold to edit. Shows the colours of the look a tap applies. */
+@Composable
+private fun SceneTile(scene: SceneItem, state: HomeState, onRun: () -> Unit, onEdit: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val colors = scene.look?.colors().orEmpty()
+    val lit = colors.filter { it != Color.Unspecified }
+    val active = scene.toggledOn
+    val container = when {
+        active -> scheme.primaryContainer
+        lit.isNotEmpty() -> lit.first().copy(alpha = 0.16f).compositeOver(scheme.surfaceContainer)
+        else -> scheme.surfaceContainer
+    }
+    Surface(
+        modifier = Modifier.height(76.dp).testTag("scene:${scene.name}"),
+        shape = RoundedCornerShape(20.dp),
+        color = container,
+        border = if (active) BorderStroke(2.dp, scheme.primary) else null,
+    ) {
+        Row(
+            Modifier
+                .combinedClickable(onClick = onRun, onLongClick = onEdit, onLongClickLabel = stringResource(R.string.edit))
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LookDots(colors, Modifier.size(width = 34.dp, height = 34.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(scene.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val detail = scene.detailText(state)
+                if (detail.isNotEmpty()) {
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Up to four dots in a 2×2 square: the colours a look sets. Grey with a slash-like ring for "off". */
+@Composable
+fun LookDots(colors: List<Color>, modifier: Modifier = Modifier) {
+    val off = MaterialTheme.colorScheme.surfaceContainerHighest
+    val ring = MaterialTheme.colorScheme.outline
+    val shown = colors.distinct().take(4).ifEmpty { listOf(Color.Unspecified) }
+    Box(modifier) {
+        shown.forEachIndexed { i, c ->
+            val single = shown.size == 1
+            val dot = if (single) 34.dp else 18.dp
+            Box(
+                Modifier
+                    .offset(x = if (single) 0.dp else (if (i % 2 == 0) 0.dp else 16.dp), y = if (single) 0.dp else (if (i < 2) 0.dp else 16.dp))
+                    .size(dot)
+                    .clip(CircleShape)
+                    .background(if (c == Color.Unspecified) off else c)
+                    .then(if (c == Color.Unspecified) Modifier.border(1.dp, ring, CircleShape) else Modifier),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoScenes(onAddStarterScenes: () -> Unit) {
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.no_scenes_body), style = MaterialTheme.typography.bodyMedium)
+            FilledTonalButton(onClick = onAddStarterScenes) { Text(stringResource(R.string.add_starter_scenes)) }
+        }
+    }
+}
 
 @Composable
 private fun SectionHeader(title: String, action: @Composable () -> Unit = {}) {

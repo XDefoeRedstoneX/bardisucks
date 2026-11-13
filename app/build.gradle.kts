@@ -25,7 +25,7 @@ android {
         // app doesn't ask for yet.
         targetSdk = 36
         versionCode = commitCount()
-        versionName = "0.1.0"
+        versionName = "0.2.0"
     }
 
     signingConfigs {

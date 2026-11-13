@@ -2,6 +2,7 @@ package bardisucks.app.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import bardisucks.app.R
 import bardisucks.core.LightCommand
@@ -11,7 +12,13 @@ import bardisucks.core.home.GroupItem
 import bardisucks.core.home.HomeState
 import bardisucks.core.home.LightItem
 import bardisucks.core.home.LightProblem
+import bardisucks.core.home.Action
+import bardisucks.core.home.SceneItem
+import bardisucks.core.home.SceneLook
+import bardisucks.core.home.SceneStyle
 import bardisucks.core.home.Target
+import bardisucks.core.home.decode
+import bardisucks.core.home.encode
 
 enum class Reach { ONLINE, CONNECTING, OFFLINE }
 
@@ -107,6 +114,42 @@ fun brightnessText(range: IntRange?): String = when {
     range == null -> ""
     range.first == range.last -> "${range.first}%"
     else -> "${range.first}–${range.last}%"
+}
+
+/** The colour each step of a look sets; [Color.Unspecified] for "off". */
+fun SceneLook.colors(): List<Color> = actions.map { a ->
+    when {
+        !a.on -> Color.Unspecified
+        a.colour != null -> hueColor(a.colour!!.hue, a.colour!!.saturation)
+        a.white != null -> whiteColor(a.white!!)
+        else -> whiteColor(40)
+    }
+}
+
+/** Under a scene's name: undo hint, the cycle's next look, or what it touches. */
+@Composable
+fun SceneItem.detailText(state: HomeState): String = when {
+    toggledOn -> stringResource(R.string.scene_tap_to_undo)
+    config.style == SceneStyle.CYCLE -> stringResource(
+        R.string.scene_next_look,
+        look?.name?.ifBlank { null } ?: stringResource(R.string.look_n, nextLook + 1),
+    )
+    else -> look?.actions.orEmpty().mapNotNull { state.targetName(it.target) }.distinct().joinToString()
+}
+
+/** Display name of a "light:…"/"group:…" reference; null if it no longer exists. */
+@Composable
+fun HomeState.targetName(ref: String): String? = when (val t = Target.decode(ref)) {
+    is Target.Light -> lights.firstOrNull { it.id == t.id }?.name
+    is Target.Group -> groups.firstOrNull { it.id == t.id }?.displayName()
+    null -> null
+}
+
+/** Display name of what a tile or shortcut does; null if it no longer exists. */
+@Composable
+fun HomeState.actionName(action: Action): String? = when (action) {
+    is Action.RunScene -> scenes.firstOrNull { it.id == action.sceneId }?.name
+    is Action.Switch -> targetName(action.target.encode())
 }
 
 /** What the screens can ask for. Implemented by [bardisucks.core.home.HomeController]. */

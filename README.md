@@ -22,7 +22,7 @@ v2 (later)  📱 Android app ──► 🖥️ mini-PC hub (+ automations, remot
 
 ## Status
 
-📱 **App v0.1.** The Android app controls lamps and groups (colour, brightness and white tone on a whole group, all lamps changing together), on phones and tablets. [How to install and use it](docs/guides/app.md). It has been tested on a PC against simulated lamps, the same way the protocol was before it worked on the real bulbs; real-phone testing is the next step. Next up: one-tap scenes.
+📱 **App v0.2.** Lamps, groups (colour/brightness on a whole group) and **one-tap scenes** (normal, toggle, cycle, with turn-off timers), plus Quick Settings tiles and home-screen shortcuts. v0.1 is confirmed working on the real lamps; v0.2 is tested on a PC against simulated lamps. [How to install and use it](docs/guides/app.md). Next up: home-screen widgets and the power strip.
 
 ```
 app/        Android app (Kotlin, Jetpack Compose): screens, key storage, app lifecycle
@@ -50,11 +50,11 @@ tools/      Python: phase 0 scripts, fake lamp, test-vector generator
 
 0. ✅ Onboarding: lamps off BARDI, keys pulled, local control verified
 1. ✅ `tuya-lan`: Kotlin Tuya LAN protocol 3.5 + `bardi` CLI *(3.3/3.4 + discovery later, if the power strip needs them)*
-2. ✅ App: full lamp control (phone + tablet layouts) *(v0.1, awaiting your test on a real phone)*
-3. ✅ Groups with colour/brightness *(v0.1; rooms and palette colours later)*
+2. ✅ App: full lamp control (phone + tablet layouts) *(v0.1, works on the real lamps)*
+3. ✅ Groups with colour/brightness *(v0.1, works on the real lamps; rooms and palette colours later)*
 4. Power strip (per-socket channels)
-5. One-tap scenes
-6. One-tap surfaces (tiles, widgets, shortcuts, tablet dashboard)
+5. ✅ One-tap scenes: normal, toggle, cycle, timers, capture *(v0.2)*
+6. ◐ One-tap surfaces: ✅ Quick Settings tiles, shortcuts *(v0.2)*; widgets, tablet dashboard later
 7. Effects editor & polish
 8. *Later:* mini-PC hub, automations, remote access (for both you and your sister)
 
