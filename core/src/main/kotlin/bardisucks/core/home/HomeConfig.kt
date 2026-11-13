@@ -44,6 +44,9 @@ data class HomeConfig(
     /** [GroupConfig.relativeBrightness] for the built-in group of all lamps. */
     val allLampsRelativeBrightness: Boolean = false,
     val swatches: List<Swatch> = DEFAULT_SWATCHES,
+    val scenes: List<SceneConfig> = emptyList(),
+    /** Quick Settings tile slot (1–6) → what it does, as [Action.encode] text. */
+    val tiles: Map<Int, String> = emptyMap(),
 ) {
     companion object {
         val DEFAULT_SWATCHES = listOf(

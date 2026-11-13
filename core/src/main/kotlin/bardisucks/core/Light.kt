@@ -37,6 +37,23 @@ sealed interface LightCommand {
 
     /** Switch to colour: hue 0–360, saturation 0–100. A null [percent] keeps the current brightness. */
     data class Colour(val hue: Int, val saturation: Int, val percent: Int? = null) : LightCommand
+
+    /**
+     * Everything a scene step sets, sent as one frame. [on] false switches off (the rest is ignored). Otherwise
+     * a [hue] switches to colour, else a [tempPercent] to white, else only the brightness changes. Null values
+     * keep what the lamp has. [offAfterSeconds] starts the lamp's own countdown, which switches it off later.
+     */
+    data class Look(
+        val on: Boolean = true,
+        val percent: Int? = null,
+        val tempPercent: Int? = null,
+        val hue: Int? = null,
+        val saturation: Int? = null,
+        val offAfterSeconds: Int? = null,
+    ) : LightCommand
+
+    /** Puts the lamp back exactly as [state] describes (undoing a toggle scene). */
+    data class Restore(val state: LightState) : LightCommand
 }
 
 /**
@@ -95,9 +112,33 @@ class LightProfile(
                 dps[mode] = LightMode.COLOUR.tuya
                 dps[colour] = LightCodec.encodeColour(colourFor(command, current))
             }
+            is LightCommand.Look -> when {
+                !command.on -> dps[power] = false
+                command.hue != null -> dps += dpsFor(LightCommand.Colour(command.hue, command.saturation ?: 100, command.percent), current)
+                command.tempPercent != null -> dps += dpsFor(LightCommand.White(command.percent, command.tempPercent), current)
+                command.percent != null -> dps += dpsFor(LightCommand.Brightness(command.percent), current)
+                else -> dps[power] = true
+            }
+            is LightCommand.Restore -> {
+                val s = command.state
+                dps[power] = s.on
+                // Values only when it ends up on: setting them on a lamp that goes off would flash it first.
+                if (s.on) {
+                    dps[mode] = s.mode.tuya
+                    dps[bright] = s.whiteLevel
+                    dps[temp] = s.temp
+                    dps[colour] = LightCodec.encodeColour(s.colour)
+                }
+            }
         }
-        // The bulb's countdown flips the power when it ends, so a pending one must not outlive a power change we make.
-        if (current != null && current.countdown > 0 && dps[power] != current.on) dps[countdown] = 0
+        val offAfter = (command as? LightCommand.Look)?.offAfterSeconds?.takeIf { command.on && it > 0 }
+        if (offAfter != null) {
+            // The countdown flips the power when it ends; the lamp is on now, so that means off.
+            dps[countdown] = offAfter.coerceAtMost(MAX_COUNTDOWN_SECONDS)
+        } else if (current != null && current.countdown > 0 && dps[power] != current.on) {
+            // A pending countdown must not outlive a power change we make, or it would flip the lamp back later.
+            dps[countdown] = 0
+        }
         return dps
     }
 
@@ -114,6 +155,10 @@ class LightProfile(
             else -> return null
         }
         return mapOf(live to LightCodec.encodeLive(hsv))
+    }
+
+    private companion object {
+        const val MAX_COUNTDOWN_SECONDS = 86_400
     }
 
     private fun colourFor(command: LightCommand.Colour, current: LightState?): Hsv {

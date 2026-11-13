@@ -2,16 +2,21 @@ package bardisucks.core.home
 
 import bardisucks.core.LightCommand
 import bardisucks.core.LightState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
@@ -63,6 +68,9 @@ data class HomeState(
     val lights: List<LightItem> = emptyList(),
     val groups: List<GroupItem> = emptyList(),
     val swatches: List<Swatch> = emptyList(),
+    val scenes: List<SceneItem> = emptyList(),
+    /** Quick Settings tile slot → what it does. */
+    val tiles: Map<Int, Action> = emptyMap(),
 )
 
 /** What a command is aimed at. */
@@ -71,7 +79,20 @@ sealed interface Target {
 
     data class Light(override val id: String) : Target
     data class Group(override val id: String) : Target
+
+    companion object
 }
+
+/** How an [Action] looks on a Quick Settings tile or in a message. */
+data class ActionInfo(val label: String, val active: Boolean, val detail: String? = null)
+
+/** Where toggle and cycle scenes stand. Kept in memory only: after a restart every scene starts afresh. */
+private data class SceneRuns(
+    /** Toggle scene id → how its lamps looked before it was applied. At most one at a time. */
+    val toggled: Map<String, Map<String, LightState>> = emptyMap(),
+    /** Cycle scene id → index of the look the next tap applies. */
+    val cycle: Map<String, Int> = emptyMap(),
+)
 
 sealed interface HomeEvent {
     /** These lamps didn't take a command. */
@@ -92,9 +113,16 @@ class HomeController(
 ) {
     private val openedKeys = ConcurrentHashMap<String, String>()
     private val unreadableKeys = ConcurrentHashMap.newKeySet<String>()
+    private val sceneRuns = MutableStateFlow(SceneRuns())
 
-    val state: StateFlow<HomeState> = combine(store.config, runtime.snapshots, ::buildState)
-        .stateIn(scope, SharingStarted.Eagerly, buildState(store.config.value, runtime.snapshots.value))
+    val state: StateFlow<HomeState> = combine(store.config, runtime.snapshots, sceneRuns, ::buildState)
+        .stateIn(scope, SharingStarted.Eagerly, buildState(store.config.value, runtime.snapshots.value, sceneRuns.value))
+
+    /**
+     * The same as [state], but computed from the latest sources. [state] reaches observers a moment after a
+     * change; decisions made right after one (save a scene, then run it) must not see the old values.
+     */
+    private fun current(): HomeState = buildState(store.config.value, runtime.snapshots.value, sceneRuns.value)
 
     private val _events = MutableSharedFlow<HomeEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<HomeEvent> = _events
@@ -120,27 +148,48 @@ class HomeController(
 
     /** A lamp flips. A group goes off if any of its lamps is on, otherwise all go on. */
     fun toggle(target: Target) {
+        switch(target)
+    }
+
+    private fun switch(target: Target): Deferred<List<String>> {
         val on = when (target) {
-            is Target.Light -> state.value.lights.firstOrNull { it.id == target.id }?.state?.on == true
-            is Target.Group -> state.value.groups.firstOrNull { it.id == target.id }?.anyOn == true
+            is Target.Light -> current().lights.firstOrNull { it.id == target.id }?.state?.on == true
+            is Target.Group -> current().groups.firstOrNull { it.id == target.id }?.anyOn == true
         }
-        apply(target, LightCommand.Power(!on))
+        return send(target, LightCommand.Power(!on))
     }
 
     /** Sends [command] to the lamp, or to every reachable lamp of the group at the same moment. */
-    @Synchronized
     fun apply(target: Target, command: LightCommand) {
+        send(target, command)
+    }
+
+    @Synchronized
+    private fun send(target: Target, command: LightCommand): Deferred<List<String>> {
         val perLamp = resolve(target, command)
         dragBase = null
         if (perLamp.isEmpty()) {
-            _events.tryEmit(HomeEvent.NoResponse(namesOf(target)))
-            return
+            val names = namesOf(target)
+            _events.tryEmit(HomeEvent.NoResponse(names))
+            return CompletableDeferred(names)
         }
-        val pending = runtime.apply(perLamp)
+        return dispatch(perLamp, offline = emptySet())
+    }
+
+    /**
+     * Sends the commands at the same moment and reports lamps that couldn't take theirs ([offline] ones
+     * included). The result lists their names; the same names also go out as a [HomeEvent.NoResponse].
+     */
+    private fun dispatch(perLamp: Map<String, LightCommand>, offline: Set<String>): Deferred<List<String>> {
+        val pending = if (perLamp.isEmpty()) CompletableDeferred(emptySet()) else runtime.apply(perLamp)
+        val result = CompletableDeferred<List<String>>()
         scope.launch {
-            val failed = pending.await()
-            if (failed.isNotEmpty()) _events.emit(HomeEvent.NoResponse(state.value.lights.filter { it.id in failed }.map { it.name }))
+            val failed = pending.await() + offline
+            val names = current().lights.filter { it.id in failed }.map { it.name }
+            if (names.isNotEmpty()) _events.emit(HomeEvent.NoResponse(names))
+            result.complete(names)
         }
+        return result
     }
 
     /** Shows [command] on the lamps while a control is being dragged. Finish the drag with [apply]. */
@@ -148,7 +197,7 @@ class HomeController(
     fun preview(target: Target, command: LightCommand) = runtime.preview(resolve(target, command))
 
     private fun resolve(target: Target, command: LightCommand): Map<String, LightCommand> {
-        val now = state.value
+        val now = current()
         return when (target) {
             is Target.Light -> now.lights.filter { it.id == target.id && it.online }.associate { it.id to command }
             is Target.Group -> {
@@ -177,8 +226,152 @@ class HomeController(
     }
 
     private fun namesOf(target: Target): List<String> = when (target) {
-        is Target.Light -> state.value.lights.filter { it.id == target.id }.map { it.name }
-        is Target.Group -> state.value.groups.firstOrNull { it.id == target.id }?.members.orEmpty().map { it.name }
+        is Target.Light -> current().lights.filter { it.id == target.id }.map { it.name }
+        is Target.Group -> current().groups.firstOrNull { it.id == target.id }?.members.orEmpty().map { it.name }
+    }
+
+    /** Ids of the lamps [target] stands for (all members of a group, reachable or not). */
+    private fun lampsOf(target: Target): List<String> = when (target) {
+        is Target.Light -> listOf(target.id)
+        is Target.Group -> current().groups.firstOrNull { it.id == target.id }?.members.orEmpty().map { it.id }
+    }
+
+    // --- scenes ---
+
+    /** Applies a scene: its look, the next look of a cycle, or for a toggle that is on, what was there before. */
+    @Synchronized
+    fun runScene(id: String): Deferred<List<String>> {
+        val scene = store.config.value.scenes.firstOrNull { it.id == id } ?: return CompletableDeferred(emptyList())
+        val runs = sceneRuns.value
+        val before = runs.toggled[id]
+        if (scene.style == SceneStyle.TOGGLE && before != null) {
+            sceneRuns.value = runs.copy(toggled = emptyMap())
+            return send(before.mapValues { (_, state) -> LightCommand.Restore(state) })
+        }
+        val index = if (scene.style == SceneStyle.CYCLE) (runs.cycle[id] ?: 0) % scene.looks.size.coerceAtLeast(1) else 0
+        val look = scene.looks.getOrNull(index) ?: return CompletableDeferred(emptyList())
+        val commands = commandsFor(look)
+        val lights = current().lights.associateBy { it.id }
+        sceneRuns.value = SceneRuns(
+            // Running any scene forgets an earlier toggle, so its next tap doesn't undo something unrelated.
+            toggled = if (scene.style == SceneStyle.TOGGLE) {
+                mapOf(id to commands.keys.mapNotNull { lamp -> lights[lamp]?.state?.let { lamp to it } }.toMap())
+            } else {
+                emptyMap()
+            },
+            cycle = if (scene.style == SceneStyle.CYCLE) runs.cycle + (id to (index + 1) % scene.looks.size) else runs.cycle,
+        )
+        return send(commands)
+    }
+
+    /** Shows [look] on the lamps without touching any toggle or cycle (the editor's "Try it"). */
+    fun tryLook(look: SceneLook): Deferred<List<String>> = send(commandsFor(look))
+
+    /** What one tap does: run a scene, or switch a lamp or group. */
+    fun run(action: Action): Deferred<List<String>> = when (action) {
+        is Action.RunScene -> runScene(action.sceneId)
+        is Action.Switch -> switch(action.target)
+    }
+
+    /**
+     * For a tap from outside the app (Quick Settings, a shortcut): connects, waits until the lamps involved
+     * answered or [timeoutMs] passed, then runs [action]. Returns the names of lamps that didn't respond.
+     */
+    suspend fun runWhenReady(action: Action, timeoutMs: Long = 6_000): List<String> {
+        start()
+        val needed = lampsFor(action)
+        withTimeoutOrNull(timeoutMs) {
+            state.first { s -> s.lights.filter { it.id in needed }.all { it.online || it.unreachable || it.problem != null } }
+        }
+        return run(action).await()
+    }
+
+    /** Label and on/off state of [action] for a tile; null if what it points at no longer exists. */
+    fun describe(action: Action, allLampsName: String): ActionInfo? {
+        val now = current()
+        return when (action) {
+            is Action.RunScene -> now.scenes.firstOrNull { it.id == action.sceneId }?.let { scene ->
+                ActionInfo(
+                    scene.name,
+                    active = scene.toggledOn,
+                    detail = scene.look?.name?.takeIf { scene.config.style == SceneStyle.CYCLE && it.isNotBlank() },
+                )
+            }
+            is Action.Switch -> when (val t = action.target) {
+                is Target.Light -> now.lights.firstOrNull { it.id == t.id }?.let { ActionInfo(it.name, it.online && it.state?.on == true) }
+                is Target.Group -> now.groups.firstOrNull { it.id == t.id }?.let { ActionInfo(if (it.builtIn) allLampsName else it.name, it.anyOn) }
+            }
+        }
+    }
+
+    /** A look with one step per lamp, matching how [lampIds] (default: every reachable lamp) look right now. */
+    fun captureLook(lampIds: List<String>? = null): SceneLook {
+        val lamps = current().lights.filter { (lampIds == null || it.id in lampIds) && it.online && it.state != null }
+        return SceneLook(actions = lamps.map { captureAction(it.id, it.state!!) })
+    }
+
+    /** Creates the scene (blank id) or replaces it; returns its id. */
+    fun saveScene(scene: SceneConfig): String {
+        val saved = if (scene.id.isBlank()) scene.copy(id = newId("s")) else scene
+        store.update { config ->
+            val scenes = if (config.scenes.any { it.id == saved.id }) config.scenes.map { if (it.id == saved.id) saved else it } else config.scenes + saved
+            config.copy(scenes = scenes)
+        }
+        // An edited toggle or cycle starts afresh.
+        sceneRuns.value = sceneRuns.value.let { it.copy(toggled = it.toggled - saved.id, cycle = it.cycle - saved.id) }
+        return saved.id
+    }
+
+    fun deleteScene(id: String) {
+        store.update { config ->
+            config.copy(
+                scenes = config.scenes.filterNot { it.id == id },
+                tiles = config.tiles.filterValues { it != Action.RunScene(id).encode() },
+            )
+        }
+        sceneRuns.value = sceneRuns.value.let { it.copy(toggled = it.toggled - id, cycle = it.cycle - id) }
+    }
+
+    /** Adds a few ready-made scenes for all lamps (or the only lamp). */
+    fun addStarterScenes(names: StarterNames = StarterNames()) {
+        val now = current()
+        val target = when {
+            now.groups.any { it.id == ALL_LAMPS } -> Target.Group(ALL_LAMPS)
+            now.lights.isNotEmpty() -> Target.Light(now.lights.first().id)
+            else -> return
+        }
+        val starters = starterScenes(target.encode(), names) { newId("s") }
+        store.update { config -> config.copy(scenes = config.scenes + starters) }
+    }
+
+    /** Binds Quick Settings tile [slot] to [action], or frees it. */
+    fun bindTile(slot: Int, action: Action?) {
+        store.update { config ->
+            config.copy(tiles = if (action == null) config.tiles - slot else config.tiles + (slot to action.encode()))
+        }
+    }
+
+    /** lamp id → its command; a lamp named by several steps (say, via a group and alone) takes the last. */
+    private fun commandsFor(look: SceneLook): Map<String, LightCommand> {
+        val commands = LinkedHashMap<String, LightCommand>()
+        for (action in look.actions) {
+            val target = Target.decode(action.target) ?: continue
+            for (lamp in lampsOf(target)) commands[lamp] = action.toCommand()
+        }
+        return commands
+    }
+
+    /** Sends to the reachable lamps; the others are reported as not responding. */
+    private fun send(commands: Map<String, LightCommand>): Deferred<List<String>> {
+        val online = current().lights.filter { it.online }.map { it.id }.toSet()
+        return dispatch(commands.filterKeys { it in online }, offline = commands.keys - online)
+    }
+
+    private fun lampsFor(action: Action): Set<String> = when (action) {
+        is Action.Switch -> lampsOf(action.target).toSet()
+        is Action.RunScene -> store.config.value.scenes.firstOrNull { it.id == action.sceneId }?.looks.orEmpty()
+            .flatMap { look -> look.actions.mapNotNull { Target.decode(it.target) } }
+            .flatMap(::lampsOf).toSet()
     }
 
     // --- devices ---
@@ -222,13 +415,20 @@ class HomeController(
     }
 
     fun removeLight(id: String) {
+        val ref = Target.Light(id).encode()
         store.update { config ->
             config.copy(
                 devices = config.devices.filterNot { it.id == id },
                 groups = config.groups.map { it.copy(members = it.members - id) },
+                scenes = config.scenes.map { it.without(ref) },
+                tiles = config.tiles.filterValues { it != ref },
             )
         }
     }
+
+    /** The scene minus every step aimed at [ref]. */
+    private fun SceneConfig.without(ref: String) =
+        copy(looks = looks.map { look -> look.copy(actions = look.actions.filterNot { it.target == ref }) })
 
     private fun updateDevice(id: String, change: (DeviceConfig) -> DeviceConfig) {
         store.update { config -> config.copy(devices = config.devices.map { if (it.id == id) change(it) else it }) }
@@ -242,7 +442,7 @@ class HomeController(
             store.update { it.copy(allLampsRelativeBrightness = relativeBrightness) }
             return ALL_LAMPS
         }
-        val group = GroupConfig(id ?: newId(), name.trim(), members.distinct(), relativeBrightness)
+        val group = GroupConfig(id ?: newId("g"), name.trim(), members.distinct(), relativeBrightness)
         store.update { config ->
             val groups = if (config.groups.any { it.id == group.id }) config.groups.map { if (it.id == group.id) group else it } else config.groups + group
             config.copy(groups = groups)
@@ -251,7 +451,14 @@ class HomeController(
     }
 
     fun deleteGroup(id: String) {
-        store.update { config -> config.copy(groups = config.groups.filterNot { it.id == id }) }
+        val ref = Target.Group(id).encode()
+        store.update { config ->
+            config.copy(
+                groups = config.groups.filterNot { it.id == id },
+                scenes = config.scenes.map { it.without(ref) },
+                tiles = config.tiles.filterValues { it != ref },
+            )
+        }
     }
 
     fun addSwatch(swatch: Swatch) {
@@ -264,7 +471,7 @@ class HomeController(
 
     // --- state ---
 
-    private fun buildState(config: HomeConfig, snapshots: Map<String, DeviceSnapshot>): HomeState {
+    private fun buildState(config: HomeConfig, snapshots: Map<String, DeviceSnapshot>, runs: SceneRuns): HomeState {
         val lights = config.devices.filter { it.category == LIGHT }.map { device ->
             val snapshot = snapshots[device.id]
             val problem = when {
@@ -281,7 +488,15 @@ class HomeController(
                 add(GroupItem(group.id, group.name, group.members.mapNotNull(byId::get), group.relativeBrightness))
             }
         }
-        return HomeState(lights, groups, config.swatches)
+        val scenes = config.scenes.map { scene ->
+            SceneItem(
+                scene,
+                toggledOn = scene.id in runs.toggled,
+                nextLook = (runs.cycle[scene.id] ?: 0) % scene.looks.size.coerceAtLeast(1),
+            )
+        }
+        val tiles = config.tiles.mapNotNull { (slot, text) -> Action.decode(text)?.let { slot to it } }.toMap()
+        return HomeState(lights, groups, config.swatches, scenes, tiles)
     }
 
     private fun endpoints(config: HomeConfig): List<DeviceEndpoint> = config.devices.mapNotNull { device ->
@@ -301,7 +516,7 @@ class HomeController(
         }
     }
 
-    private fun newId() = "g" + java.util.UUID.randomUUID().toString().take(8)
+    private fun newId(prefix: String) = prefix + java.util.UUID.randomUUID().toString().take(8)
 
     companion object {
         /** Id of the built-in group that always contains every lamp. */
